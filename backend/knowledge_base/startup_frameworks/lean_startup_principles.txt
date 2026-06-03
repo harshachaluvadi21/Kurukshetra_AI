@@ -1,0 +1,8 @@
+Title: The Lean Startup Framework - Minimum Viable Product (MVP) and Market Sizing
+Author: Startup Vault
+Category: Startup Frameworks
+
+The core principle of evaluating any startup idea is validating the market need with the smallest possible investment. This is known as the Minimum Viable Product (MVP) approach. 
+When sizing a market (TAM, SAM, SOM), investors look for a Total Addressable Market of at least $1 Billion to justify venture-scale returns. A strong CAGR (Compound Annual Growth Rate) of >10% indicates a rapidly expanding market where a startup can capture value even against incumbents.
+
+Macro trends such as AI automation, remote work infrastructure, and aging population demographics are the primary drivers for new market creation in the current decade.

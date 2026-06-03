@@ -1,0 +1,15 @@
+node_modules/
+.next/
+venv/
+__pycache__/
+*.pyc
+.env
+.env.local
+.env.*.local
+dist/
+build/
+.DS_Store
+kurukshetra.db
+chroma_db/
+outputs/
+evaluation/benchmark_results.json
