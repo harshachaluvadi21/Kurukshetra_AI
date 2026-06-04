@@ -18,6 +18,8 @@ export const metadata: Metadata = {
   description: "Multi-agent AI platform that evaluates startup ideas using debates, web intelligence, RAG, and scoring engines.",
 };
 
+import { AuthProvider } from "./AuthProvider";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -35,8 +37,10 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
       </head>
       <body className="min-h-screen bg-zinc-950 text-zinc-50 antialiased" suppressHydrationWarning>
-        <NavBar />
-        <main>{children}</main>
+        <AuthProvider>
+          <NavBar />
+          <main>{children}</main>
+        </AuthProvider>
       </body>
     </html>
   );

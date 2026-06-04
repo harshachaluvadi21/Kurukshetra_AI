@@ -39,6 +39,11 @@ class Settings(BaseSettings):
     WEIGHT_INVESTMENT_READINESS: float = 0.20
     WEIGHT_RISK_LEVEL: float = 0.15
     
+    # Auth / OAuth
+    google_client_id: str = Field(..., alias="GOOGLE_CLIENT_ID")
+    google_client_secret: str = Field(..., alias="GOOGLE_CLIENT_SECRET")
+    secret_key: str = Field(..., alias="SECRET_KEY")
+    
     model_config = SettingsConfigDict(env_file=env_path, env_file_encoding="utf-8", extra="ignore")
 
     def validate_health(self):

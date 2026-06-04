@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.websockets.manager import websocket_router
-from app.api.routes import projects, runs
+from app.api.routes import projects, runs, auth
 from fastapi.staticfiles import StaticFiles
 import os
 
@@ -15,6 +15,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth.router, prefix="/auth", tags=["Auth"])
 app.include_router(projects.router, prefix="/api/v1/projects", tags=["Projects"])
 app.include_router(runs.router, prefix="/api/v1/runs", tags=["Runs"])
 app.include_router(websocket_router, prefix="/ws/v1", tags=["WebSockets"])
