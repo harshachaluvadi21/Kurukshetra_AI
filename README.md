@@ -95,6 +95,18 @@ CORS_ORIGINS=https://your-vercel-app.vercel.app,http://localhost:3000
 After Render finishes deploying, open this URL in your browser:
 
 ```text
+https://your-render-service.onrender.com/
+```
+
+Expected response:
+
+```json
+{"name":"Kurukshetra AI Backend","status":"running","health":"/health","docs":"/docs"}
+```
+
+Then open the health check URL:
+
+```text
 https://your-render-service.onrender.com/health
 ```
 

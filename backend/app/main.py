@@ -34,6 +34,16 @@ os.makedirs(outputs_dir, exist_ok=True)
 app.mount("/outputs", StaticFiles(directory=outputs_dir), name="outputs")
 
 
+@app.get("/")
+async def root():
+    return {
+        "name": "Kurukshetra AI Backend",
+        "status": "running",
+        "health": "/health",
+        "docs": "/docs",
+    }
+
+
 @app.get("/health")
 async def health_check():
     return {"status": "healthy"}
