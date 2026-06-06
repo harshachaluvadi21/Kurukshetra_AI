@@ -19,13 +19,14 @@ if config.config_file_name is not None:
 # add your model's MetaData object here
 # for 'autogenerate' support
 from app.db.database import Base
+from app.db.url import normalize_async_database_url
 import app.db.models
 import os
 from dotenv import load_dotenv
 
 load_dotenv()
 target_metadata = Base.metadata
-config.set_main_option("sqlalchemy.url", os.environ["DATABASE_URL"])
+config.set_main_option("sqlalchemy.url", normalize_async_database_url(os.environ["DATABASE_URL"]))
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:

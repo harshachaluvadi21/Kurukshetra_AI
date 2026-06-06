@@ -10,16 +10,7 @@ class ChromaVectorStore(VectorStore):
     def __init__(self, collection_name: str = "kurukshetra_knowledge"):
         self.persist_directory = settings.chroma_persist_directory
         
-        if settings.chroma_host and settings.chroma_api_key:
-            self.client = chromadb.HttpClient(
-                host=settings.chroma_host,
-                ssl=True,
-                headers={"x-chroma-token": settings.chroma_api_key},
-                tenant=settings.chroma_tenant or chromadb.config.DEFAULT_TENANT,
-                database=settings.chroma_database or chromadb.config.DEFAULT_DATABASE
-            )
-        else:
-            self.client = chromadb.PersistentClient(path=self.persist_directory)
+        self.client = self._create_client()
         
         # We assume Google API key is available in settings or environment
         api_key = settings.google_api_key or "dummy_key_for_dev_mode"
@@ -30,6 +21,21 @@ class ChromaVectorStore(VectorStore):
             collection_name=collection_name,
             embedding_function=self.embeddings,
         )
+
+    def _create_client(self):
+        if settings.chroma_host and settings.chroma_api_key:
+            try:
+                return chromadb.HttpClient(
+                    host=settings.chroma_host,
+                    ssl=True,
+                    headers={"x-chroma-token": settings.chroma_api_key},
+                    tenant=settings.chroma_tenant or chromadb.config.DEFAULT_TENANT,
+                    database=settings.chroma_database or chromadb.config.DEFAULT_DATABASE,
+                )
+            except Exception as exc:
+                print(f"[ChromaVectorStore] Hosted Chroma unavailable, falling back to local store: {exc}")
+
+        return chromadb.PersistentClient(path=self.persist_directory)
 
     def add_texts(self, texts: List[str], metadatas: List[Dict[str, Any]]):
         self.vector_store.add_texts(texts=texts, metadatas=metadatas)

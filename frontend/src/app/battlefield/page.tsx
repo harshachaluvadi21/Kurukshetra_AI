@@ -13,6 +13,8 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useEffect, Suspense } from 'react';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
 /* ─── Tab type ─── */
 type TabId = 'overview' | 'market' | 'competition' | 'financials' | 'strategy' | 'report';
 
@@ -485,7 +487,7 @@ function BattlefieldContent() {
         setIsMockMode(false);
         setRunId(urlRunId);
       }, 0);
-      fetch(`http://localhost:8000/api/v1/runs/${urlRunId}`)
+      fetch(`${API_URL}/api/v1/runs/${urlRunId}`)
         .then(res => res.json())
         .then(data => {
           if (data.final_state) {
@@ -526,7 +528,7 @@ function BattlefieldContent() {
 
   useEffect(() => {
     if (!reportLinks?.json_path) return;
-    fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}${reportLinks.json_path}`)
+    fetch(`${API_URL}${reportLinks.json_path}`)
       .then(res => res.json())
       .then(data => {
         setFinalState({ final_report: data });
@@ -550,7 +552,7 @@ function BattlefieldContent() {
     }
     setIsRunning(true);
     try {
-      const res = await fetch('http://localhost:8000/api/v1/runs/', {
+      const res = await fetch(`${API_URL}/api/v1/runs/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -566,7 +568,7 @@ function BattlefieldContent() {
       if (data.run_id) {
         setRunId(data.run_id);
         const execRes = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/v1/runs/${data.run_id}/execute`,
+          `${API_URL}/api/v1/runs/${data.run_id}/execute`,
           { method: 'POST', headers: { 'Content-Type': 'application/json' } }
         );
         if (!execRes.ok) throw new Error('Failed to execute run');
@@ -721,7 +723,7 @@ function BattlefieldContent() {
               </div>
               {reportLinks?.pdf_path ? (
                 <a
-                  href={`http://localhost:8000${reportLinks.pdf_path}`}
+                  href={`${API_URL}${reportLinks.pdf_path}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold bg-indigo-600 text-white hover:bg-indigo-500 transition-colors"
