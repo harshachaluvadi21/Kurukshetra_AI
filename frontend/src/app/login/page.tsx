@@ -6,6 +6,15 @@ import Link from 'next/link';
 import { Swords, Mail, Lock, ArrowRight, Loader2, AlertCircle } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
 
+function getSafeNextPath() {
+  if (typeof window === 'undefined') return '/';
+
+  const next = new URLSearchParams(window.location.search).get('next');
+  if (!next || !next.startsWith('/') || next.startsWith('//')) return '/';
+  if (next.startsWith('/login') || next.startsWith('/register') || next.startsWith('/auth/')) return '/';
+  return next;
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const { login, isAuthenticated, isLoading: authLoading, error, clearError } = useAuthStore();
@@ -17,7 +26,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (isAuthenticated && !authLoading) {
-      router.push('/');
+      router.push(getSafeNextPath());
     }
   }, [isAuthenticated, authLoading, router]);
 
@@ -37,7 +46,7 @@ export default function LoginPage() {
     setSubmitting(true);
     try {
       await login(email, password);
-      router.push('/');
+      router.push(getSafeNextPath());
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Login failed';
       setLocalError(message);
@@ -77,7 +86,7 @@ export default function LoginPage() {
 
           {/* Google Button */}
           <a
-            href="/api/auth/google"
+            href={`/api/auth/google?next=${encodeURIComponent(getSafeNextPath())}`}
             className="w-full flex items-center justify-center gap-3 px-4 py-3 rounded-lg border border-zinc-700 bg-zinc-800/50 text-white font-medium text-sm hover:bg-zinc-800 hover:border-zinc-600 transition-all duration-200"
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24">

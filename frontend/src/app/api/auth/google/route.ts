@@ -10,6 +10,12 @@ function randomState() {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
+function safeNextPath(value: string | null) {
+  if (!value || !value.startsWith('/') || value.startsWith('//')) return '/';
+  if (value.startsWith('/login') || value.startsWith('/register') || value.startsWith('/auth/')) return '/';
+  return value;
+}
+
 export async function GET(request: Request) {
   const clientId = googleClientId();
   if (!clientId) {
@@ -19,6 +25,7 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const redirectUri = `${url.origin}/api/auth/google/callback`;
   const state = randomState();
+  const next = safeNextPath(url.searchParams.get('next'));
   const googleUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
 
   googleUrl.searchParams.set('client_id', clientId);
@@ -30,6 +37,13 @@ export async function GET(request: Request) {
 
   const response = NextResponse.redirect(googleUrl);
   response.cookies.set('kurukshetra_oauth_state', state, {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 10 * 60,
+    path: '/',
+  });
+  response.cookies.set('kurukshetra_oauth_next', next, {
     httpOnly: true,
     sameSite: 'lax',
     secure: process.env.NODE_ENV === 'production',

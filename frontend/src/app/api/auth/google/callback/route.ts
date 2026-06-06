@@ -3,6 +3,12 @@ import { cookies } from 'next/headers';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
+function safeNextPath(value: string | undefined) {
+  if (!value || !value.startsWith('/') || value.startsWith('//')) return '/';
+  if (value.startsWith('/login') || value.startsWith('/register') || value.startsWith('/auth/')) return '/';
+  return value;
+}
+
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const code = url.searchParams.get('code');
@@ -20,6 +26,7 @@ export async function GET(request: Request) {
   // Validate CSRF state
   const cookieStore = await cookies();
   const savedState = cookieStore.get('kurukshetra_oauth_state')?.value;
+  const next = safeNextPath(cookieStore.get('kurukshetra_oauth_next')?.value);
 
   if (!savedState || state !== savedState) {
     return NextResponse.redirect(new URL('/login?error=Invalid+state', request.url));
@@ -44,8 +51,9 @@ export async function GET(request: Request) {
     const token = data.access_token;
     
     // Redirect to frontend callback page with the token
-    const response = NextResponse.redirect(new URL(`/auth/callback?token=${token}`, request.url));
+    const response = NextResponse.redirect(new URL(`/auth/callback?token=${token}&next=${encodeURIComponent(next)}`, request.url));
     response.cookies.delete('kurukshetra_oauth_state');
+    response.cookies.delete('kurukshetra_oauth_next');
     return response;
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Unknown error';

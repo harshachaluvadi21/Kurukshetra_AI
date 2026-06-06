@@ -13,11 +13,12 @@ function AuthCallbackContent() {
 
   useEffect(() => {
     const token = searchParams.get('token');
+    const next = searchParams.get('next') || '/';
     const err = searchParams.get('error');
 
     if (err) {
-      setError(decodeURIComponent(err));
       // Redirect to login after 3 seconds on error
+      setTimeout(() => setError(decodeURIComponent(err)), 0);
       setTimeout(() => router.push('/login'), 3000);
       return;
     }
@@ -25,14 +26,14 @@ function AuthCallbackContent() {
     if (token) {
       loginWithToken(token)
         .then(() => {
-          router.push('/');
+          router.push(next.startsWith('/') && !next.startsWith('//') ? next : '/');
         })
         .catch(() => {
           setError('Failed to log in with Google');
           setTimeout(() => router.push('/login'), 3000);
         });
     } else {
-      setError('No token provided');
+      setTimeout(() => setError('No token provided'), 0);
       setTimeout(() => router.push('/login'), 3000);
     }
   }, [searchParams, router, loginWithToken]);
