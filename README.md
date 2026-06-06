@@ -35,6 +35,7 @@ If you deploy manually instead of using the blueprint, use:
 - Runtime: **Python**
 - Build command: `pip install -r requirements.txt`
 - Start command: `alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+- Environment variable: `PYTHON_VERSION=3.12.4`
 
 ### Use Neon PostgreSQL
 
@@ -64,6 +65,7 @@ In the Render backend service, open **Environment** and add:
 
 ```env
 ENVIRONMENT=production
+PYTHON_VERSION=3.12.4
 DATABASE_URL=<your-neon-postgres-url>
 GOOGLE_API_KEY=<your-gemini-api-key>
 GROQ_API_KEY=<your-groq-api-key>
@@ -109,6 +111,14 @@ If the deploy fails during `alembic upgrade head`, check:
 - The connection string includes `sslmode=require`.
 - You pasted the full URL, including query parameters.
 
+If the deploy fails while installing `asyncpg`, check the Render logs for `cp314` or Python `3.14`. That means Render is using Python 3.14 instead of Python 3.12. Set this in Render -> backend service -> **Environment**:
+
+```env
+PYTHON_VERSION=3.12.4
+```
+
+Then trigger **Manual Deploy** -> **Clear build cache & deploy**.
+
 ## 2. Frontend on Vercel
 
 ### Import the frontend
@@ -153,14 +163,15 @@ Use the same `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in Render. Use the sa
 2. Deploy backend on Render from `render.yaml`.
 3. Do not create a Render database.
 4. Add the Neon URL as Render `DATABASE_URL`.
-5. Add all backend API keys and OAuth secrets in Render.
-6. Wait until `https://your-render-service.onrender.com/health` returns `{"status":"healthy"}`.
-7. Deploy frontend on Vercel with root directory `frontend`.
-8. Add `NEXT_PUBLIC_API_URL=https://your-render-service.onrender.com` in Vercel.
-9. Update Render `CORS_ORIGINS=https://your-vercel-app.vercel.app`.
-10. Add Google OAuth redirect URI: `https://your-vercel-app.vercel.app/api/auth/google/callback`.
-11. Redeploy both services after changing environment variables.
-12. Run login and a sample analysis from the deployed frontend.
+5. Add `PYTHON_VERSION=3.12.4` in Render.
+6. Add all backend API keys and OAuth secrets in Render.
+7. Wait until `https://your-render-service.onrender.com/health` returns `{"status":"healthy"}`.
+8. Deploy frontend on Vercel with root directory `frontend`.
+9. Add `NEXT_PUBLIC_API_URL=https://your-render-service.onrender.com` in Vercel.
+10. Update Render `CORS_ORIGINS=https://your-vercel-app.vercel.app`.
+11. Add Google OAuth redirect URI: `https://your-vercel-app.vercel.app/api/auth/google/callback`.
+12. Redeploy both services after changing environment variables.
+13. Run login and a sample analysis from the deployed frontend.
 
 ## Secret rotation note
 
