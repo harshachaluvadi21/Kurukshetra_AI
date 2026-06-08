@@ -1,68 +1,34 @@
-# Kurukshetra AI Deployment Guide
+# Kurukshetra AI
 
-This repo has two deployable apps:
+## Problem Statement
+Early-stage founders struggle to validate startup ideas because market research, competitor analysis, financial feasibility, and business planning are scattered across multiple tools and require significant time, expertise, and resources. This often leads to poor decision-making, delayed execution, and a high risk of startup failure. There is a need for an AI-powered platform that can autonomously analyze business ideas, generate actionable insights, and provide data-driven recommendations in a single workflow.
 
-- `frontend/`: Next.js app, deploy on Vercel
-- `backend/`: FastAPI app, deploy on Render
-- Database: Neon PostgreSQL
+## How It Works
+Kurukshetra AI is a full-stack AI application powered by multiple Large Language Models (LLMs). It uses a Next.js frontend for an interactive user interface and a FastAPI backend to handle real-time communications via WebSockets, database operations, and AI orchestration using LangChain and various AI providers.
 
-Deploy the backend first. The frontend needs the backend public URL.
+## Key Features
+- **Multi-LLM Support:** Integrates with Google Gemini and Groq for fast and accurate AI responses.
+- **Advanced Search & Retrieval:** Uses Tavily and Serper for web search, combined with ChromaDB for vector storage and retrieval.
+- **Real-time Interaction:** Employs WebSockets for low-latency communication.
+- **Secure Authentication:** Built-in Google OAuth integration for secure user login.
+- **Modern Database:** Asynchronous operations with Neon PostgreSQL.
 
-Never commit real API keys, database URLs, OAuth secrets, or `.env` files. Put production secrets only in Render and Vercel environment variables.
+## Tech Stack
+- **Frontend:** Next.js (Deployed on Vercel)
+- **Backend:** FastAPI, Python 3.12.4 (Deployed on Render)
+- **Database:** Neon PostgreSQL (Relational), ChromaDB (Vector Store)
+- **AI / ML:** LangChain, Google Gemini API, Groq API, Tavily, Serper
 
-## Deployment Architecture
+## Architecture
+The application is separated into a serverless frontend and a continuous backend service:
+- **Frontend (Vercel):** Hosts the Next.js React application and manages Google OAuth redirects.
+- **Backend (Render):** Hosts the FastAPI web service, processing API requests and WebSocket connections.
+- **Database (Neon):** Hosts the PostgreSQL database, managed securely without exposing credentials.
 
-- Vercel hosts only the frontend.
-- Render hosts only the FastAPI backend.
-- Neon hosts the PostgreSQL database.
-- Do not create or use a Render PostgreSQL database for this project.
+## Environment Variables (.env)
+To run this project, you need to configure the following environment variables. **Never commit real API keys to version control.**
 
-## 1. Backend on Render
-
-### Create the web service
-
-1. Go to [Render](https://dashboard.render.com/).
-2. Click **New +** -> **Blueprint**.
-3. Connect the GitHub repository you pushed.
-4. Select the repository root. Render will read `render.yaml`.
-5. Create the service.
-6. Skip any Render PostgreSQL/database creation prompts. The database is Neon.
-
-If you deploy manually instead of using the blueprint, use:
-
-- Service type: **Web Service**
-- Root directory: `backend`
-- Runtime: **Python**
-- Build command: `pip install -r requirements.txt`
-- Start command: `alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-- Environment variable: `PYTHON_VERSION=3.12.4`
-
-### Use Neon PostgreSQL
-
-This project is configured to use Neon PostgreSQL. Render is only the backend host.
-
-1. Go to the [Neon dashboard](https://console.neon.tech/).
-2. Open your Neon project.
-3. Open **Connection Details**.
-4. Select the pooled connection string if Neon shows both pooled and direct options.
-5. Copy the PostgreSQL connection string.
-6. In Render, open the backend web service -> **Environment**.
-7. Add the Neon connection string as `DATABASE_URL`.
-
-Use this shape, replacing the password/host with your real Neon values inside Render only:
-
-```env
-DATABASE_URL=postgresql://neondb_owner:<password>@<neon-pooler-host>/neondb?sslmode=require&channel_binding=require
-```
-
-Do not paste the real Neon URL into `README.md`, `render.yaml`, `.env.example`, or any committed file.
-
-The backend automatically converts Neon URLs like `postgresql://...` to the async SQLAlchemy format it needs, so you do not need to manually change it to `postgresql+asyncpg://...`.
-
-### Add backend environment variables
-
-In the Render backend service, open **Environment** and add:
-
+### Backend (`backend/.env`)
 ```env
 ENVIRONMENT=production
 PYTHON_VERSION=3.12.4
@@ -81,134 +47,59 @@ LANGCHAIN_PROJECT=Kurukshetra_AI
 GOOGLE_CLIENT_ID=<your-google-oauth-client-id>
 GOOGLE_CLIENT_SECRET=<your-google-oauth-client-secret>
 SECRET_KEY=<generate-a-long-random-secret>
-CORS_ORIGINS=https://your-vercel-app.vercel.app
-```
-
-After the frontend is deployed, update `CORS_ORIGINS` to your real Vercel URL. For multiple allowed origins, use commas:
-
-```env
 CORS_ORIGINS=https://your-vercel-app.vercel.app,http://localhost:3000
 ```
 
-### Verify backend
-
-After Render finishes deploying, open this URL in your browser:
-
-```text
-https://your-render-service.onrender.com/
-```
-
-Expected response:
-
-```json
-{"name":"Kurukshetra AI Backend","status":"running","health":"/health","docs":"/docs"}
-```
-
-Then open the health check URL:
-
-```text
-https://your-render-service.onrender.com/health
-```
-
-Expected response:
-
-```json
-{"status":"healthy"}
-```
-
-If the deploy fails during `alembic upgrade head`, check:
-
-- `DATABASE_URL` is set in Render.
-- The Neon database is active.
-- The connection string includes `sslmode=require`.
-- You pasted the full URL, including query parameters.
-
-If the deploy fails while installing `asyncpg`, check the Render logs for `cp314` or Python `3.14`. That means Render is using Python 3.14 instead of Python 3.12. Set this in Render -> backend service -> **Environment**:
-
-```env
-PYTHON_VERSION=3.12.4
-```
-
-Then trigger **Manual Deploy** -> **Clear build cache & deploy**.
-
-## 2. Frontend on Vercel
-
-### Import the frontend
-
-1. Go to [Vercel](https://vercel.com/new).
-2. Import the same GitHub repository.
-3. Set **Root Directory** to `frontend`.
-4. Keep framework as **Next.js**.
-5. Build settings are already defined in `frontend/vercel.json`.
-
-### Add frontend environment variables
-
-In Vercel project settings, add:
-
+### Frontend (`frontend/.env.local`)
 ```env
 NEXT_PUBLIC_API_URL=https://your-render-service.onrender.com
 GOOGLE_CLIENT_ID=<your-google-oauth-client-id>
 NEXT_PUBLIC_GOOGLE_CLIENT_ID=<your-google-oauth-client-id>
 ```
 
-Redeploy the frontend after adding or changing environment variables.
+## Installation Steps
 
-## 3. Google OAuth setup
+### Local Development
 
-In Google Cloud Console, open your OAuth client and add this authorized redirect URI:
-
-```text
-https://your-vercel-app.vercel.app/api/auth/google/callback
-```
-
-For local development, also keep:
-
-```text
-http://localhost:3000/api/auth/google/callback
-```
-
-Use the same `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in Render. Use the same client ID in Vercel.
-
-## 4. Final deployment checklist
-
-1. Push this repo to GitHub.
-2. Deploy backend on Render from `render.yaml`.
-3. Do not create a Render database.
-4. Add the Neon URL as Render `DATABASE_URL`.
-5. Add `PYTHON_VERSION=3.12.4` in Render.
-6. Add all backend API keys and OAuth secrets in Render.
-7. Wait until `https://your-render-service.onrender.com/health` returns `{"status":"healthy"}`.
-8. Deploy frontend on Vercel with root directory `frontend`.
-9. Add `NEXT_PUBLIC_API_URL=https://your-render-service.onrender.com` in Vercel.
-10. Update Render `CORS_ORIGINS=https://your-vercel-app.vercel.app`.
-11. Add Google OAuth redirect URI: `https://your-vercel-app.vercel.app/api/auth/google/callback`.
-12. Redeploy both services after changing environment variables.
-13. Run login and a sample analysis from the deployed frontend.
-
-## Secret rotation note
-
-If a real Neon connection string, API key, or OAuth secret is shared in chat, screenshots, logs, or committed code, rotate it in the provider dashboard and update the new value in Render/Vercel. This avoids surprise access to your database.
-
-## Local Development
-
-Backend:
-
+**1. Backend Setup:**
 ```bash
 cd backend
 python -m venv venv
-venv\Scripts\activate
+venv\Scripts\activate  # On Windows. Use `source venv/bin/activate` on Mac/Linux
 pip install -r requirements.txt
-copy .env.example .env
+copy .env.example .env # Update with your keys
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-Frontend:
-
+**2. Frontend Setup:**
 ```bash
 cd frontend
 npm install
-copy .env.example .env.local
+copy .env.example .env.local # Update with your keys
 npm run dev
 ```
+Open `http://localhost:3000` to view the application.
 
-Open `http://localhost:3000`.
+### Production Deployment
+
+**1. Backend (Render):**
+- Create a new **Web Service** on Render from the GitHub repo.
+- Set Root directory: `backend`
+- Set Runtime: **Python**
+- Build command: `pip install -r requirements.txt`
+- Start command: `alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+- Add the backend environment variables in the Render dashboard.
+
+**2. Frontend (Vercel):**
+- Import the repo into Vercel.
+- Set Root Directory: `frontend`
+- Add the frontend environment variables in the Vercel dashboard.
+
+**3. Google OAuth Setup:**
+- In Google Cloud Console, add `https://your-vercel-app.vercel.app/api/auth/google/callback` to your authorized redirect URIs.
+
+
+## Author Info
+- **Name:** Sai Harsha Chaluvadi
+- **GitHub:** [@harshachaluvadi21](https://github.com/harshachaluvadi21)
+- **LinkedIn:** [@Sai Harsha Chaluvadi](https://www.linkedin.com/in/saiharshachaluvadi)
