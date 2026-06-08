@@ -14,11 +14,11 @@ async def lifespan(app: FastAPI):
         async with engine.begin() as conn:
             await conn.execute(text("SELECT 1"))
         print("\n" + "="*50)
-        print("🚀 DATABASE CONNECTED SUCCESSFULLY!")
+        print("[SUCCESS] DATABASE CONNECTED SUCCESSFULLY!")
         print("="*50 + "\n")
     except Exception as e:
         print("\n" + "="*50)
-        print(f"❌ DATABASE CONNECTION FAILED: {e}")
+        print(f"[ERROR] DATABASE CONNECTION FAILED: {e}")
         print("="*50 + "\n")
     yield
     await engine.dispose()

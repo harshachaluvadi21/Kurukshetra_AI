@@ -127,7 +127,11 @@ export default function HistoryPage() {
                       <td className="px-6 py-4 whitespace-nowrap">
                         {run.status === 'completed' ? (
                           <div>
-                            <div className="text-sm font-bold text-white">{run.battle_score}/100</div>
+                            <div className="text-sm font-bold text-white">
+                              {typeof run.battle_score === 'object' && run.battle_score !== null 
+                                ? (run.battle_score as any).composite_score 
+                                : run.battle_score}/100
+                            </div>
                             <div className="text-xs text-indigo-400 font-medium">{run.verdict}</div>
                           </div>
                         ) : (
