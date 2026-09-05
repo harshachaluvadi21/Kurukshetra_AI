@@ -34,3 +34,7 @@ class ExecutiveReport(BaseModel):
     
     generated_at: str
     report_id: str
+    target_market: Optional[str] = "India"
+    currency: Optional[str] = "INR"
+    currency_symbol: Optional[str] = "₹"
+    sections: List[ReportSection] = Field(default_factory=list, description="Complete 21-section report array")

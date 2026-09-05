@@ -10,6 +10,8 @@ from app.intelligence.service import intelligence_service
 from app.rag.knowledge_service import knowledge_service
 from app.intelligence.evidence_aggregator import evidence_aggregator
 
+from app.services.market_context import detect_market_context
+
 class IntelligenceScout(BaseAgent):
     def __init__(self):
         super().__init__("Intelligence Scout")
@@ -23,14 +25,16 @@ class IntelligenceScout(BaseAgent):
     async def _execute(self, state: GraphState) -> Dict[str, Any]:
         idea = state["startup_idea"]
         run_id = state.get("run_id", "unknown")
+        market_ctx = detect_market_context(idea)
         
-        # 1. Gather Web Intelligence
-        query = f"{idea.business_concept} market size and trends"
+        # 1. Gather Web Intelligence with geography-aware query
+        market_qualifier = f"in {market_ctx.country}" if market_ctx.country else ""
+        query = f"{idea.business_concept} {market_qualifier} market size trends".strip()
         search_intel = await intelligence_service.gather_intelligence(
             query=query, 
             run_id=run_id, 
             agent_name=self.name,
-            claim_context="Market sizing and macro trends"
+            claim_context=f"Market sizing and macro trends for {market_ctx.country}"
         )
         
         # 2. Gather Knowledge Base Intelligence (RAG)
@@ -46,7 +50,7 @@ class IntelligenceScout(BaseAgent):
         combined_pkg = evidence_aggregator.merge(
             search_evidence=[search_intel["evidence"]],
             knowledge_evidence=[knowledge_evidence],
-            summary="Market sizing evidence combined from live search and curated frameworks."
+            summary=f"Market sizing evidence combined from live search in {market_ctx.country} and curated frameworks."
         )
         citations = search_intel["citations"]
         
@@ -55,10 +59,16 @@ class IntelligenceScout(BaseAgent):
         
         # 4. LLM Reasoning
         prompt_path = os.path.join(os.path.dirname(__file__), '..', 'llm', 'prompts', 'intelligence_scout.txt')
-        with open(prompt_path, 'r') as f:
+        with open(prompt_path, 'r', encoding='utf-8') as f:
             prompt_template = f.read()
         
+        factors_str = "\n".join(f"- {f}" for f in market_ctx.relevant_factors) or "- Standard commercial regulations"
+        
         prompt = prompt_template.format(
+            target_market=market_ctx.country,
+            currency_code=market_ctx.currency_code,
+            currency_symbol=market_ctx.currency_symbol,
+            market_factors=factors_str,
             company_name=idea.company_name,
             business_concept=idea.business_concept,
             industry=idea.industry,
@@ -75,9 +85,11 @@ class IntelligenceScout(BaseAgent):
             agent_name=self.name
         )
         
-        # 5. Attach citations and combined evidence programmatically
+        # 5. Attach citations, currency, and combined evidence programmatically
         response.data.citations = citations
         response.data.evidence = combined_pkg
+        if not getattr(response.data, "currency", None):
+            response.data.currency = market_ctx.currency_code
         
         return {
             "scout_output": response

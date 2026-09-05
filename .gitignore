@@ -13,3 +13,7 @@ kurukshetra.db
 chroma_db/
 outputs/
 evaluation/benchmark_results.json
+scratch/
+backend/scripts/evaluate_campuspool_india.py
+backend/scripts/test_universal_framework.py
+

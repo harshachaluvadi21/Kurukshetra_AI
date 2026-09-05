@@ -9,19 +9,22 @@ class MarkdownExporter:
         
         md_content = []
         
-        # Build document iteratively
-        sections = [
-            report.executive_summary,
-            report.market_research,
-            report.swot_analysis,
-            report.competitor_analysis,
-            report.pricing_strategy,
-            report.financial_analysis,
-            report.go_to_market_strategy,
-            report.critic_analysis,
-            report.evidence_citations,
-            report.final_recommendation
-        ]
+        # Use complete 21 sections if populated, otherwise fallback to legacy list
+        if getattr(report, "sections", None) and len(report.sections) > 0:
+            sections = report.sections
+        else:
+            sections = [
+                report.executive_summary,
+                report.market_research,
+                report.swot_analysis,
+                report.competitor_analysis,
+                report.pricing_strategy,
+                report.financial_analysis,
+                report.go_to_market_strategy,
+                report.critic_analysis,
+                report.evidence_citations,
+                report.final_recommendation
+            ]
         
         for section in sections:
             md_content.append(section.content_markdown)

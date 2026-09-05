@@ -6,11 +6,15 @@ from app.rag.models import CombinedEvidence
 # Scout
 class ScoutData(BaseModel):
     industry: str = Field(..., description="The identified broad industry classification.")
-    market_size_usd: float = Field(..., description="Estimated TAM in USD.")
+    market_size_usd: float = Field(..., description="Estimated TAM in USD or local currency amount.")
     growth_rate: float = Field(..., description="Estimated CAGR percentage.")
     trends: List[str] = Field(..., description="Top 3 macro trends affecting this concept.")
     customer_behavior: List[str] = Field(default_factory=list, description="Observed customer behavior patterns relevant to the concept.")
     regional_opportunities: List[str] = Field(default_factory=list, description="Regions or geographies with the strongest opportunity.")
+    currency: Optional[str] = Field(default="INR", description="Currency code (INR, USD, EUR, GBP).")
+    market_size_local: Optional[float] = Field(None, description="Estimated TAM in local currency units.")
+    tam_status: Optional[str] = Field(default="Estimated", description="Status: User-provided, Source-based, Estimated, Model assumption, Proposed target, or Insufficient verified data; requires validation.")
+    sam_som_notes: Optional[str] = Field(default=None, description="SAM / SOM breakdowns or status if verified.")
     citations: List[Citation] = Field(default_factory=list, description="Citations used for this analysis.")
     evidence: Optional[CombinedEvidence] = Field(None, description="Combined evidence package backing this analysis.")
 
@@ -20,6 +24,7 @@ class Competitor(BaseModel):
     category: str = Field(..., description="E.g., Incumbent, Startup, Direct, Indirect.")
     strengths: List[str] = Field(..., description="Core strengths of this competitor.")
     weaknesses: List[str] = Field(..., description="Core weaknesses or vulnerabilities.")
+    geography: Optional[str] = Field(default="India", description="Operating market: India, Regional, or Global.")
 
 class OpponentAnalystData(BaseModel):
     direct_competitors: List[Competitor] = Field(..., description="List of direct competitors.")
@@ -32,11 +37,14 @@ class OpponentAnalystData(BaseModel):
 # Treasury
 class TreasuryAdvisorData(BaseModel):
     pricing_model: str = Field(..., description="Proposed pricing strategy (e.g., B2B SaaS per seat).")
-    projected_revenue_year_1: float = Field(..., description="Estimated Year 1 revenue in USD.")
-    projected_revenue_year_3: float = Field(..., description="Estimated Year 3 revenue in USD.")
-    estimated_cac: float = Field(..., description="Estimated Customer Acquisition Cost in USD.")
-    estimated_ltv: float = Field(..., description="Estimated Customer Lifetime Value in USD.")
+    projected_revenue_year_1: float = Field(..., description="Estimated Year 1 revenue in local currency.")
+    projected_revenue_year_3: float = Field(..., description="Estimated Year 3 revenue in local currency.")
+    estimated_cac: float = Field(..., description="Estimated Customer Acquisition Cost in local currency.")
+    estimated_ltv: float = Field(..., description="Estimated Customer Lifetime Value in local currency.")
     break_even_months: int = Field(..., description="Estimated months to reach break-even.")
+    currency: Optional[str] = Field(default="INR", description="Currency code (e.g. INR, USD, GBP, EUR).")
+    currency_symbol: Optional[str] = Field(default="₹", description="Currency symbol.")
+    financial_status: Optional[str] = Field(default="Model assumption", description="Status of financial figures (Estimated / Model assumption / Proposed target).")
     citations: List[Citation] = Field(default_factory=list, description="Citations used for this analysis.")
     evidence: Optional[CombinedEvidence] = Field(None, description="Combined evidence package backing this analysis.")
 
@@ -47,6 +55,9 @@ class StrategyCommanderData(BaseModel):
     execution_plan: List[str] = Field(..., description="High-level phased execution steps.")
     research_priorities: List[str] = Field(..., description="What the other agents should focus on.")
     success_factors: List[str] = Field(..., description="Critical factors for this startup to win.")
+    mvp_scope: Optional[List[str]] = Field(default_factory=list, description="Specific MVP deliverables.")
+    validation_strategy: Optional[List[str]] = Field(default_factory=list, description="Validation steps to test core assumptions.")
+    success_metrics: Optional[List[str]] = Field(default_factory=list, description="North star and pilot KPI targets.")
 
 class SWOTAnalysis(BaseModel):
     strengths: List[str] = Field(default_factory=list)

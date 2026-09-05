@@ -6,6 +6,8 @@ from app.schemas.agents import StrategyCommanderData
 from app.llm.schemas import AgentLLMResponse
 from app.llm.router import llm_router
 
+from app.services.market_context import detect_market_context
+
 class StrategyCommander(BaseAgent):
     def __init__(self):
         super().__init__("Strategy Commander")
@@ -18,12 +20,16 @@ class StrategyCommander(BaseAgent):
 
     async def _execute(self, state: GraphState) -> Dict[str, Any]:
         idea = state["startup_idea"]
+        market_ctx = detect_market_context(idea)
         
         prompt_path = os.path.join(os.path.dirname(__file__), '..', 'llm', 'prompts', 'strategy_commander.txt')
-        with open(prompt_path, 'r') as f:
+        with open(prompt_path, 'r', encoding='utf-8') as f:
             prompt_template = f.read()
         
         prompt = prompt_template.format(
+            target_market=market_ctx.country,
+            currency_code=market_ctx.currency_code,
+            currency_symbol=market_ctx.currency_symbol,
             company_name=idea.company_name,
             business_concept=idea.business_concept,
             industry=idea.industry,

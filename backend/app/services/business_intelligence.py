@@ -111,12 +111,16 @@ def _self_reference(name: str, company: str, concept: str) -> bool:
     return normalized in tokens
 
 
+from app.services.market_context import detect_market_context, format_currency_amount
+
+
 def build_swot(state: GraphState) -> SWOTAnalysis:
     scout = _data(state.get("scout_output"))
     analyst = _data(state.get("analyst_output"))
     treasury = _data(state.get("treasury_output"))
     commander = _data(state.get("commander_output"))
     idea = state.get("startup_idea")
+    market_ctx = detect_market_context(idea)
     company_name = getattr(idea, "company_name", "")
     concept = getattr(idea, "business_concept", "")
 
@@ -127,10 +131,17 @@ def build_swot(state: GraphState) -> SWOTAnalysis:
         if name and not _self_reference(str(name), company_name, concept):
             competitor_names.append(str(name))
 
+    growth_rate = getattr(scout, 'growth_rate', None)
+    growth_str = f"Estimated growth rate: {growth_rate}% CAGR." if growth_rate else "Market growth requires validation."
+
+    cac = getattr(treasury, 'estimated_cac', 0) or 0
+    ltv = getattr(treasury, 'estimated_ltv', 0) or 0
+    ltv_cac_str = f"Target LTV/CAC ratio of {round(ltv / max(cac, 1), 2)}x." if cac > 0 and ltv > 0 else "Unit economics requires validation."
+
     strengths = _first([
         *_list(getattr(commander, "success_factors", [])),
-        f"Market is growing at an estimated {getattr(scout, 'growth_rate', 'unknown')}% CAGR.",
-        f"Revenue model supports LTV/CAC of {round(getattr(treasury, 'estimated_ltv', 0) / max(getattr(treasury, 'estimated_cac', 1), 1), 2)}.",
+        growth_str,
+        ltv_cac_str,
     ])
 
     weaknesses = _first([
@@ -139,11 +150,14 @@ def build_swot(state: GraphState) -> SWOTAnalysis:
         "Execution depends on validating acquisition and retention assumptions.",
     ])
 
+    market_size_val = getattr(scout, 'market_size_local', None) or getattr(scout, 'market_size_usd', 0)
+    market_size_fmt = format_currency_amount(market_size_val, market_ctx.currency_symbol, market_ctx.currency_code)
+
     opportunities = _first([
         *_list(getattr(scout, "regional_opportunities", [])),
         *_list(getattr(scout, "customer_behavior", [])),
         *_list(getattr(scout, "trends", [])),
-        f"Estimated market size is ${getattr(scout, 'market_size_usd', 0):,.0f}.",
+        f"Target market opportunity in {market_ctx.country} estimated at {market_size_fmt}.",
         "Use focused positioning to enter underserved segments before broad expansion.",
     ])
 
@@ -154,7 +168,7 @@ def build_swot(state: GraphState) -> SWOTAnalysis:
     ]
     threats = _first([
         *market_threats,
-        f"Competitive pressure from {', '.join(competitor_names[:3])}." if competitor_names else "Competitive pressure from incumbents and substitutes.",
+        f"Competitive pressure from {', '.join(competitor_names[:3])}." if competitor_names else f"Competitive pressure from incumbents in {market_ctx.country}.",
         "Margin pressure if acquisition or operating costs rise faster than revenue.",
     ])
 
@@ -168,6 +182,7 @@ def build_swot(state: GraphState) -> SWOTAnalysis:
 
 def build_gtm_strategy(state: GraphState) -> GTMStrategy:
     idea = state.get("startup_idea")
+    market_ctx = detect_market_context(idea)
     scout = _data(state.get("scout_output"))
     analyst = _data(state.get("analyst_output"))
     treasury = _data(state.get("treasury_output"))
@@ -178,48 +193,57 @@ def build_gtm_strategy(state: GraphState) -> GTMStrategy:
         target_users.append(idea.target_users)
     target_users.extend(_list(getattr(commander, "research_priorities", []))[:2])
     if not target_users:
-        target_users = ["Early adopters with urgent pain around the stated business problem."]
+        target_users = [f"Early adopters in {market_ctx.country} with urgent pain around the stated problem."]
 
     customer_behavior = _first([
         *_list(getattr(scout, "customer_behavior", [])),
-        "Convenience-led, repeat-purchase behavior in dense urban catchments.",
+        f"Target customer decision cycle in {market_ctx.country} driven by clear ROI and immediate utility.",
     ])
 
     regional_opportunities = _first([
         *_list(getattr(scout, "regional_opportunities", [])),
-        "High-density metro clusters and nearby satellite markets.",
+        f"High-priority launch regions and hubs in {market_ctx.country}.",
     ])
 
     positioning = (
-        f"Position {idea.company_name if idea else 'the startup'} as a focused solution for {idea.target_users if idea and idea.target_users else 'the target segment'}, "
-        f"using {getattr(treasury, 'pricing_model', 'a validated pricing model')} and evidence from the strongest market trends."
+        f"Position {idea.company_name if idea else 'the startup'} in {market_ctx.country} as a focused solution for "
+        f"{idea.target_users if idea and idea.target_users else 'the target segment'}, "
+        f"using {getattr(treasury, 'pricing_model', 'a validated pricing model')} aligned with local customer purchasing power."
     )
 
-    channels = _first([
+    # Adapt channels to market factors
+    channel_list = [
         "Direct outreach to high-intent customer segments",
-        "Partnerships with category platforms and ecosystem operators",
-        "Founder-led content and proof-led case studies",
-        "Referral loops from successful early customers",
-    ])
+        "Partnerships with ecosystem platforms and distribution partners",
+        "Founder-led proof and case studies",
+        "Referral loops from pilot customer cohorts",
+    ]
+    if market_ctx.is_india and any("whatsapp" in f.lower() for f in market_ctx.relevant_factors):
+        channel_list.insert(1, "WhatsApp-enabled customer engagement and community loops")
+
+    channels = _first(channel_list)
+
+    cac_val = getattr(treasury, 'estimated_cac', 0)
+    cac_fmt = format_currency_amount(cac_val, market_ctx.currency_symbol, market_ctx.currency_code) if cac_val else "modeled target"
 
     customer_acquisition = _first([
         *_list(getattr(scout, "customer_behavior", [])),
-        f"Keep CAC below the modeled ${getattr(treasury, 'estimated_cac', 0):,.0f} threshold.",
+        f"Keep CAC disciplined below the {cac_fmt} target.",
         "Prioritize narrow pilots with measurable retention and repeat usage.",
-        "Convert competitor feature gaps into landing-page and sales objections.",
+        "Convert competitor feature gaps into differentiated value messaging.",
     ])
 
     launch_plan = _first([
         *_list(getattr(scout, "regional_opportunities", [])),
         *_list(getattr(commander, "execution_plan", [])),
-        "Launch with a controlled pilot, publish proof metrics, then expand channel coverage.",
+        f"Launch with a controlled {market_ctx.country} pilot, measure unit economics, then expand channel coverage.",
     ], limit=5)
 
     growth_strategy = _first([
         *_list(getattr(scout, "customer_behavior", [])),
         *_list(getattr(scout, "trends", [])),
         *_list(getattr(analyst, "feature_gaps", [])),
-        "Expand into adjacent segments after unit economics are validated.",
+        "Expand into adjacent regional segments after core unit economics are proven.",
     ], limit=5)
 
     return GTMStrategy(

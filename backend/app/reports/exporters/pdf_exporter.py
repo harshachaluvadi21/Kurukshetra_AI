@@ -12,8 +12,15 @@ class PdfExporter:
             with open(md_path, "r", encoding="utf-8") as f:
                 md_content = f.read()
                 
-            # Replace common unicode characters that standard Helvetica doesn't support
-            md_content = md_content.replace('“', '"').replace('”', '"').replace("‘", "'").replace("’", "'").replace('—', '-')
+            # Replace common unicode characters and currency symbols that standard Helvetica doesn't support
+            md_content = (
+                md_content.replace('“', '"').replace('”', '"')
+                .replace("‘", "'").replace("’", "'")
+                .replace('—', '-')
+                .replace('₹', 'Rs. ')
+                .replace('€', 'EUR ')
+                .replace('£', 'GBP ')
+            )
             
             # Convert markdown to HTML
             html_content = markdown.markdown(md_content, extensions=['tables'])

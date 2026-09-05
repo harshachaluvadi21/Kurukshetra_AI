@@ -8,6 +8,8 @@ class StartupIdea(BaseModel):
     problem_statement: Optional[str] = None
     target_users: Optional[str] = None
     revenue_model: Optional[str] = None
+    target_market: Optional[str] = None
+    geography: Optional[str] = None
 
 class ProjectVersion(BaseModel):
     version_tag: str = Field(..., description="e.g., v1.0")

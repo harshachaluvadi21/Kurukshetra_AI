@@ -1,14 +1,13 @@
 'use client';
-
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Swords, Mail, Lock, ArrowRight, Loader2, AlertCircle } from 'lucide-react';
+import { Swords, Mail, Lock, ArrowRight, AlertCircle } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
+import { InlineLoader } from '@/components/ui/States';
 
 function getSafeNextPath() {
   if (typeof window === 'undefined') return '/';
-
   const next = new URLSearchParams(window.location.search).get('next');
   if (!next || !next.startsWith('/') || next.startsWith('//')) return '/';
   if (next.startsWith('/login') || next.startsWith('/register') || next.startsWith('/auth/')) return '/';
@@ -18,78 +17,54 @@ function getSafeNextPath() {
 export default function LoginPage() {
   const router = useRouter();
   const { login, isAuthenticated, isLoading: authLoading, error, clearError } = useAuthStore();
-
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [localError, setLocalError] = useState('');
 
-  useEffect(() => {
-    if (isAuthenticated && !authLoading) {
-      router.push(getSafeNextPath());
-    }
-  }, [isAuthenticated, authLoading, router]);
-
-  useEffect(() => {
-    clearError();
-  }, [clearError]);
+  useEffect(() => { if (isAuthenticated && !authLoading) router.push(getSafeNextPath()); }, [isAuthenticated, authLoading, router]);
+  useEffect(() => { clearError(); }, [clearError]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLocalError('');
-
-    if (!email || !password) {
-      setLocalError('Please fill in all fields');
-      return;
-    }
-
+    if (!email || !password) { setLocalError('Please fill in all fields'); return; }
     setSubmitting(true);
-    try {
-      await login(email, password);
-      router.push(getSafeNextPath());
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Login failed';
-      setLocalError(message);
-    } finally {
-      setSubmitting(false);
-    }
+    try { await login(email, password); router.push(getSafeNextPath()); }
+    catch (err) { setLocalError(err instanceof Error ? err.message : 'Login failed'); }
+    finally { setSubmitting(false); }
   };
 
   const displayError = localError || error;
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 py-12 relative">
-      {/* Background effects */}
-      <div className="absolute inset-0 bg-gradient-to-b from-indigo-950/20 via-zinc-950 to-zinc-950" />
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-indigo-500/6 rounded-full blur-3xl" />
-      <div className="absolute bottom-0 right-1/4 w-[300px] h-[300px] bg-purple-500/5 rounded-full blur-3xl" />
-
-      <div className="relative w-full max-w-md animate-slide-up">
+    <div style={{ minHeight: '100vh', background: 'var(--bg-page)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px 16px' }}>
+      <div style={{ width: '100%', maxWidth: 420 }}>
         {/* Logo */}
-        <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center gap-2.5 group">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-              <Swords className="w-5 h-5 text-white" />
+        <div style={{ textAlign: 'center', marginBottom: 32 }}>
+          <Link href="/" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, textDecoration: 'none' }}>
+            <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg,#6366F1,#4F46E5)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Swords className="w-4.5 h-4.5" style={{ color: '#fff', width: 18, height: 18 }} />
             </div>
-            <span className="text-xl font-bold tracking-tight text-white">
-              Kurukshetra<span className="text-indigo-400">.ai</span>
+            <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>
+              Kurukshetra<span style={{ color: 'var(--accent)' }}>.ai</span>
             </span>
           </Link>
         </div>
 
         {/* Card */}
-        <div className="glass-card p-8">
-          <div className="text-center mb-6">
-            <h1 className="text-2xl font-bold text-white mb-1">Welcome back</h1>
-            <p className="text-sm text-zinc-400">Sign in to your account to continue</p>
+        <div className="card" style={{ padding: '32px' }}>
+          <div style={{ textAlign: 'center', marginBottom: 24 }}>
+            <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 6px' }}>Welcome back</h1>
+            <p style={{ fontSize: 14, color: 'var(--text-secondary)', margin: 0 }}>Sign in to your account</p>
           </div>
 
-          {/* Google Button */}
+          {/* Google */}
           <a
             href={`/api/auth/google?next=${encodeURIComponent(getSafeNextPath())}`}
-            className="w-full flex items-center justify-center gap-3 px-4 py-3 rounded-lg border border-zinc-700 bg-zinc-800/50 text-white font-medium text-sm hover:bg-zinc-800 hover:border-zinc-600 transition-all duration-200"
+            style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '10px 16px', borderRadius: 8, border: '1px solid var(--border-strong)', background: '#fff', fontSize: 14, fontWeight: 500, color: 'var(--text-primary)', cursor: 'pointer', textDecoration: 'none', transition: 'border-color 0.15s, background 0.15s', marginBottom: 20 }}
           >
-            <svg className="w-5 h-5" viewBox="0 0 24 24">
+            <svg className="w-5 h-5" viewBox="0 0 24 24" style={{ width: 18, height: 18 }}>
               <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" />
               <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
               <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
@@ -99,80 +74,44 @@ export default function LoginPage() {
           </a>
 
           {/* Divider */}
-          <div className="flex items-center gap-3 my-6">
-            <div className="flex-1 h-px bg-zinc-800" />
-            <span className="text-xs text-zinc-500 uppercase tracking-wider">or</span>
-            <div className="flex-1 h-px bg-zinc-800" />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+            <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+            <span style={{ fontSize: 12, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>or</span>
+            <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
           </div>
 
           {/* Error */}
           {displayError && (
-            <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm mb-4 animate-fade-in">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              {displayError}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 8, background: 'var(--danger-light)', border: '1px solid var(--danger-border)', marginBottom: 16 }}>
+              <AlertCircle className="w-4 h-4" style={{ color: 'var(--danger)', flexShrink: 0 }} />
+              <span style={{ fontSize: 13, color: 'var(--danger-text)' }}>{displayError}</span>
             </div>
           )}
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div>
-              <label htmlFor="login-email" className="block text-sm font-medium text-zinc-300 mb-1.5">
-                Email
-              </label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
-                <input
-                  id="login-email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@example.com"
-                  className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-zinc-900 border border-zinc-800 text-white placeholder-zinc-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all"
-                  autoComplete="email"
-                />
+              <label htmlFor="login-email" className="label">Email</label>
+              <div style={{ position: 'relative' }}>
+                <Mail className="w-4 h-4" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-tertiary)' }} />
+                <input id="login-email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" className="input-field" style={{ paddingLeft: 36 }} autoComplete="email" />
               </div>
             </div>
-
             <div>
-              <label htmlFor="login-password" className="block text-sm font-medium text-zinc-300 mb-1.5">
-                Password
-              </label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
-                <input
-                  id="login-password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-zinc-900 border border-zinc-800 text-white placeholder-zinc-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all"
-                  autoComplete="current-password"
-                />
+              <label htmlFor="login-password" className="label">Password</label>
+              <div style={{ position: 'relative' }}>
+                <Lock className="w-4 h-4" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-tertiary)' }} />
+                <input id="login-password" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" className="input-field" style={{ paddingLeft: 36 }} autoComplete="current-password" />
               </div>
             </div>
-
-            <button
-              type="submit"
-              disabled={submitting}
-              className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-indigo-600 text-white font-semibold text-sm hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-600/20 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {submitting ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <>
-                  Sign In
-                  <ArrowRight className="w-4 h-4" />
-                </>
-              )}
+            <button type="submit" disabled={submitting} className="btn btn-primary" style={{ justifyContent: 'center', padding: '12px' }}>
+              {submitting ? <InlineLoader /> : <><span>Sign In</span><ArrowRight className="w-4 h-4" /></>}
             </button>
           </form>
 
-          {/* Register link */}
-          <p className="text-center text-sm text-zinc-400 mt-6">
+          <p style={{ textAlign: 'center', fontSize: 13, color: 'var(--text-secondary)', marginTop: 20 }}>
             Don&apos;t have an account?{' '}
-            <Link href="/register" className="text-indigo-400 hover:text-indigo-300 font-medium transition-colors">
-              Create one
-            </Link>
+            <Link href="/register" style={{ color: 'var(--accent)', fontWeight: 600, textDecoration: 'none' }}>Create one</Link>
           </p>
         </div>
       </div>

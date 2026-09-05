@@ -9,6 +9,8 @@ from app.llm.schemas import AgentLLMResponse
 from app.schemas.agents import CriticAnalysisData
 
 
+from app.services.market_context import detect_market_context
+
 class CriticAgent(BaseAgent):
     def __init__(self):
         super().__init__("Critic Agent")
@@ -28,12 +30,16 @@ class CriticAgent(BaseAgent):
     async def _execute(self, state: GraphState) -> Dict[str, Any]:
         idea = state["startup_idea"]
         run_id = state.get("run_id", "unknown")
+        market_ctx = detect_market_context(idea)
 
         prompt_path = os.path.join(os.path.dirname(__file__), "..", "llm", "prompts", "critic_agent.txt")
-        with open(prompt_path, "r") as f:
+        with open(prompt_path, "r", encoding="utf-8") as f:
             prompt_template = f.read()
 
         prompt = prompt_template.format(
+            target_market=market_ctx.country,
+            currency_code=market_ctx.currency_code,
+            currency_symbol=market_ctx.currency_symbol,
             company_name=idea.company_name,
             business_concept=idea.business_concept,
             problem_statement=idea.problem_statement or "Not provided",

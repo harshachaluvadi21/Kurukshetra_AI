@@ -59,12 +59,20 @@ async def skeptic_node(state: DebateState):
     competitors = _names(getattr(analyst, "direct_competitors", []))
     market_threat = _first(getattr(analyst, "market_threats", []), f"competitive response from better-funded players in {industry}")
     failure_risk = _first(getattr(critic, "failure_risks", []), f"the core operating model for {company} may not scale profitably")
+    from app.services.market_context import detect_market_context, format_currency_amount
+    market_ctx = detect_market_context(state.get("startup_idea"))
+    
+    cac_val = getattr(treasury, 'estimated_cac', 0)
+    ltv_val = getattr(treasury, 'estimated_ltv', 0)
+    cac_str = format_currency_amount(cac_val, market_ctx.currency_symbol, market_ctx.currency_code) if cac_val else "modeled CAC"
+    ltv_str = format_currency_amount(ltv_val, market_ctx.currency_symbol, market_ctx.currency_code) if ltv_val else "modeled LTV"
+
     vuln_msg = (
         f"For {company}, the biggest challenge is {failure_risk}. Market growth around "
         f"{getattr(scout, 'growth_rate', 'unknown')}% is attractive, but competitors such as "
         f"{', '.join(competitors[:3]) or 'key incumbents'} and {market_threat} can pressure margins. "
-        f"The plan must prove CAC near ${getattr(treasury, 'estimated_cac', 0):,.0f}, LTV near "
-        f"${getattr(treasury, 'estimated_ltv', 0):,.0f}, and break-even within "
+        f"The plan must prove CAC near {cac_str}, LTV near "
+        f"{ltv_str}, and break-even within "
         f"{getattr(treasury, 'break_even_months', 'unknown')} months for the {concept} wedge."
     )
     await emit_debate_event(EventType.DEBATE_TURN, run_id, "Skeptic", vuln_msg)

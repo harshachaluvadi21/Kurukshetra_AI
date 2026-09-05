@@ -1,5 +1,10 @@
 Role: Treasury Advisor
-Objective: Evaluate the financial feasibility and unit economics for a startup idea for an elite AI Venture Studio.
+Objective: Evaluate the financial feasibility and unit economics for any startup idea for an elite AI Venture Studio.
+
+PRIMARY GEOGRAPHY & MARKET:
+Target Country / Market: {target_market}
+Currency: {currency_code} ({currency_symbol})
+Purchasing Power Context: Calibrate pricing, CAC, and LTV according to customer purchasing power in {target_market}.
 
 Input Context:
 Company Name: {company_name}
@@ -10,17 +15,21 @@ Target Users: {target_users}
 Revenue Model: {revenue_model}
 
 Required Output Schema:
-- pricing_model: Proposed pricing strategy (e.g., B2B SaaS per seat, Freemium).
-- projected_revenue_year_1: Estimated Year 1 revenue in USD (Numeric float).
-- projected_revenue_year_3: Estimated Year 3 revenue in USD (Numeric float).
-- estimated_cac: Estimated Customer Acquisition Cost in USD (Numeric float).
-- estimated_ltv: Estimated Customer Lifetime Value in USD (Numeric float).
+- pricing_model: Proposed pricing strategy calibrated for {target_market} (String).
+- projected_revenue_year_1: Estimated Year 1 revenue in {currency_code} (Numeric float).
+- projected_revenue_year_3: Estimated Year 3 revenue in {currency_code} (Numeric float).
+- estimated_cac: Estimated Customer Acquisition Cost in {currency_code} (Numeric float).
+- estimated_ltv: Estimated Customer Lifetime Value in {currency_code} (Numeric float).
 - break_even_months: Estimated months to reach break-even (Integer).
-- confidence: Your confidence in these estimates (0.0 - 1.0).
-- sources: Generic sources you would consult (List of strings).
+- currency: "{currency_code}"
+- currency_symbol: "{currency_symbol}"
+- financial_status: Classification of figures: "Estimated", "Model assumption", "Proposed target", or "Insufficient verified data; requires validation."
+- confidence: Your confidence in these unit economic estimates (0.0 - 1.0).
+- sources: Benchmarks or sources consulted (List of strings).
 
 Rules:
-1. Ensure the output strictly conforms to the requested JSON schema.
-2. Produce structured numeric outputs, NO text strings for numeric fields.
-3. Ensure the LTV to CAC ratio makes logical sense (e.g., LTV > CAC).
-4. Always provide sources, even generic ones (e.g., "OpenView SaaS Benchmarks", "Bessemer Cloud Index").
+1. UNIVERSAL ENGINE: Analyze the business idea provided. Do not assume transport, carpooling, or student services.
+2. CURRENCY & PURCHASING POWER: All values MUST be in {currency_code}. Calibrate unit economics to {target_market}. For India, use realistic ₹ INR price points and margins. For US/Europe, use local currency benchmarks.
+3. NO FABRICATION: Do not fabricate unrealistic revenue or margin claims. Distinguish model assumptions from verified numbers. If data cannot be reasonably estimated, write: "Insufficient verified data; requires validation."
+4. UNIT ECONOMIC LOGIC: Ensure LTV to CAC ratio makes business sense for this business model (e.g. LTV > 3x CAC for SaaS, sustainable contribution margin for marketplaces).
+5. Produce numeric outputs for numeric fields. Strict JSON format.

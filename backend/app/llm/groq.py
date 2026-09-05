@@ -31,12 +31,16 @@ class GroqProvider(LLMProvider):
                 result = await structured_llm.ainvoke(prompt)
                 latency = (datetime.utcnow() - start_time).total_seconds()
                 
-                # Append provider metadata
-                result.provider_metadata = {
+                # Append provider metadata via model_copy (Pydantic v2 safe)
+                metadata = {
                     "provider": "groq",
                     "model": self.model_name,
                     "latency": round(latency, 2)
                 }
+                try:
+                    result = result.model_copy(update={"provider_metadata": metadata})
+                except Exception:
+                    pass  # If model_copy fails, return result without metadata
                 return result
             except Exception as e:
                 if attempt < self.max_retries - 1:
