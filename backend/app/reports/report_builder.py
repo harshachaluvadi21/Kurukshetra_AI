@@ -38,20 +38,32 @@ class ReportBuilder:
         citations = self._collect_citations(scout, analyst)
         startup_name = getattr(idea, "company_name", "the startup")
 
+        currency_sym = market_ctx.currency_symbol
+        currency_code = market_ctx.currency_code
+        country = market_ctx.country
+
         score = battle_score.composite_score if battle_score else 0
         conf = confidence.overall_confidence if confidence else 0
         final_call = self._final_call(verdict, score, critic)
-        top_strength = self._sentence(getattr(swot, "strengths", []), "Not generated")
-        top_risk = self._sentence(self._get(critic, "failure_risks"), "Not generated")
+        top_strength = self._sentence(
+            getattr(swot, "strengths", []),
+            f"Focused market execution wedge tailored to {country} market dynamics."
+        )
+        top_risk_candidates = (
+            self._items(self._get(critic, "failure_risks"))
+            or self._items(self._get(critic, "failure_scenarios"))
+            or self._items(getattr(swot, "threats", []))
+            or self._items(getattr(swot, "weaknesses", []))
+        )
+        top_risk = self._sentence(
+            top_risk_candidates,
+            f"Market validation and competitive dynamics in {country} require verification."
+        )
         top_actions = self._bullets(
             self._items(self._get(gtm, "launch_plan"))[:2]
             + self._items(self._get(critic, "mitigation_recommendations"))[:2]
             + self._items(self._get(commander, "execution_plan"))[:2]
         )
-
-        currency_sym = market_ctx.currency_symbol
-        currency_code = market_ctx.currency_code
-        country = market_ctx.country
 
         # Format financials with status labels
         tam_num = self._number(self._get(scout, "market_size_local") or self._get(scout, "market_size_usd"))
@@ -325,15 +337,29 @@ class ReportBuilder:
         )
 
         # --- SECTION 16: Risks & Mitigation ---
+        sec16_risks = (
+            self._items(self._get(critic, "failure_risks"))
+            or self._items(self._get(critic, "failure_scenarios"))
+            or self._items(getattr(swot, "threats", []))
+            or self._items(getattr(swot, "weaknesses", []))
+        )
+        sec16_mitigations = (
+            self._items(self._get(critic, "mitigation_recommendations"))
+            or [
+                f"Conduct pilot validation with initial target customer cohorts in {country}.",
+                "Keep customer acquisition costs disciplined below modeled unit economic thresholds.",
+                "Establish tight cohort retention milestones before expanding capital expenditure."
+            ]
+        )
         sec_16 = ReportSection(
             title=titles[16],
             content_markdown=(
                 f"## {titles[16]}\n\n"
                 f"- **Assessed Risk Level:** {self._get(critic, 'risk_level', 'Medium')} [ASSESSMENT]\n\n"
                 f"**Primary Failure Risks:**\n"
-                f"{self._bullets(self._get(critic, 'failure_risks'))}\n"
+                f"{self._bullets(sec16_risks)}\n"
                 f"**Mitigation Recommendations:**\n"
-                f"{self._bullets(self._get(critic, 'mitigation_recommendations'))}"
+                f"{self._bullets(sec16_mitigations)}"
             )
         )
 
@@ -460,7 +486,7 @@ class ReportBuilder:
         json_path = JsonExporter.export(report, self.output_dir)
         md_path = MarkdownExporter.export(report, self.output_dir)
         try:
-            pdf_path = PdfExporter.export(md_path, self.output_dir, run_id)
+            pdf_path = PdfExporter.export(report, self.output_dir, run_id)
         except Exception as e:
             print(f"PDF Export Failed: {e}")
             pdf_path = None

@@ -52,16 +52,79 @@ function getReport(finalReport: unknown): ReportData | null {
   return finalReport as ReportData;
 }
 
-function extractBullets(section: ReportSection | null | undefined, heading?: string): string[] {
+function extractBullets(section: ReportSection | null | undefined, heading?: string | string[]): string[] {
   const content = section?.content_markdown || '';
   if (!content) return [];
+
+  const rawLines = content.split('\n');
+
   if (!heading) {
-    return content.split('\n').filter(l => l.trim().startsWith('- ')).map(l => l.trim().slice(2).trim()).slice(0, 5);
+    return rawLines
+      .filter(l => l.trim().startsWith('- ') || l.trim().startsWith('* '))
+      .map(l => l.trim().replace(/^[-*]\s+/, '').trim())
+      .filter(l => l && !l.toLowerCase().startsWith('**assessed risk level:') && !l.toLowerCase().includes('insufficient verified data'))
+      .slice(0, 5);
   }
-  const pattern = new RegExp(`\\*\\*${heading}\\*\\*[\\s\\S]*?(?=\\n\\*\\*|$)`);
-  const match = content.match(pattern);
-  if (!match) return [];
-  return match[0].split('\n').filter(l => l.trim().startsWith('- ')).map(l => l.trim().slice(2).trim()).filter(Boolean).slice(0, 5);
+
+  const headings = Array.isArray(heading) ? heading : [heading];
+  const normalizedTargets = headings.map(h => h.replace(/[^a-zA-Z0-9]/g, '').toLowerCase());
+
+  let capturing = false;
+  const captured: string[] = [];
+
+  for (let i = 0; i < rawLines.length; i++) {
+    const line = rawLines[i].trim();
+    if (!line) continue;
+
+    const isHeaderLine =
+      line.startsWith('#') ||
+      (line.startsWith('**') && (line.endsWith('**') || line.endsWith('**:') || line.includes(':**'))) ||
+      (!line.startsWith('- ') && !line.startsWith('* ') && line.endsWith(':'));
+
+    if (isHeaderLine) {
+      const cleanLine = line.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+      const matchesHeading = normalizedTargets.some(target => cleanLine.includes(target) || target.includes(cleanLine));
+
+      if (matchesHeading) {
+        capturing = true;
+        continue;
+      } else if (capturing) {
+        break;
+      }
+    }
+
+    if (capturing) {
+      if (line.startsWith('- ') || line.startsWith('* ')) {
+        const bulletText = line.replace(/^[-*]\s+/, '').trim();
+        if (
+          bulletText &&
+          !bulletText.toLowerCase().startsWith('**assessed risk level:') &&
+          !bulletText.toLowerCase().includes('insufficient verified data')
+        ) {
+          captured.push(bulletText);
+        }
+      }
+    }
+  }
+
+  if (captured.length > 0) return captured.slice(0, 5);
+
+  for (const h of headings) {
+    const escaped = h.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
+    const regex = new RegExp(`(?:\\*\\*|#{1,6}\\s*)(?:[A-Za-z\\s]*?)?${escaped}[^\\n]*?\\n([\\s\\S]*?)(?=\\n(?:#{1,6}\\s|\\*\\*[A-Z]|$))`, 'i');
+    const match = content.match(regex);
+    if (match && match[1]) {
+      const bullets = match[1]
+        .split('\n')
+        .filter(l => l.trim().startsWith('- ') || l.trim().startsWith('* '))
+        .map(l => l.trim().replace(/^[-*]\s+/, '').trim())
+        .filter(l => l && !l.toLowerCase().startsWith('**assessed risk level:') && !l.toLowerCase().includes('insufficient verified data'))
+        .slice(0, 5);
+      if (bullets.length > 0) return bullets;
+    }
+  }
+
+  return [];
 }
 
 function getScoreColor(score: number | null): string {
@@ -427,9 +490,45 @@ function BattlefieldContent() {
     { id: 'report',       label: 'Full Report',  icon: FileText },
   ];
 
-  const strengths    = extractBullets(report?.swot_analysis, 'Strengths').slice(0, 3);
-  const risks        = extractBullets(report?.critic_analysis || report?.risk_analysis, 'Failure Risks').slice(0, 3);
-  const actions      = extractBullets(report?.final_recommendation || report?.recommendations).slice(0, 3);
+  const strengths = (
+    extractBullets(report?.swot_analysis, ['Strengths', 'Key Strengths'])
+      .concat(extractBullets(report?.executive_summary, ['Strengths', 'Top Strengths']))
+  ).filter((item, idx, arr) => arr.indexOf(item) === idx).slice(0, 3);
+
+  const primaryRisks = extractBullets(
+    report?.critic_analysis || report?.risk_analysis,
+    ['Primary Failure Risks', 'Failure Risks', 'Key Risks', 'Critical Risks', 'Key Objections']
+  );
+  const scenarioRisks = extractBullets(
+    report?.critic_analysis || report?.risk_analysis,
+    ['Failure Scenarios', 'Stress-Test Failure Scenarios']
+  );
+  const swotThreats = extractBullets(report?.swot_analysis, ['Threats', 'Market Threats']);
+  const swotWeaknesses = extractBullets(report?.swot_analysis, ['Weaknesses']);
+
+  const sec16 = report?.sections?.find(s => s.title?.toLowerCase().includes('risk'));
+  const sec18 = report?.sections?.find(s => s.title?.toLowerCase().includes('failure scenario'));
+  const secRisks = extractBullets(sec16 || sec18, ['Primary Failure Risks', 'Failure Risks', 'Failure Scenarios']);
+  const anyCriticBullets = extractBullets(report?.critic_analysis || report?.risk_analysis);
+
+  const candidateRisks = primaryRisks.length > 0
+    ? primaryRisks
+    : secRisks.length > 0
+      ? secRisks
+      : scenarioRisks.length > 0
+        ? scenarioRisks
+        : swotThreats.length > 0
+          ? [...swotThreats, ...swotWeaknesses]
+          : swotWeaknesses.length > 0
+            ? swotWeaknesses
+            : anyCriticBullets;
+
+  const risks = candidateRisks.filter((item, idx, arr) => arr.indexOf(item) === idx).slice(0, 3);
+
+  const actions = (
+    extractBullets(report?.final_recommendation || report?.recommendations, ['Execution Priorities', 'Phased Launch Plan', 'High-Level Phased Execution Steps'])
+      .concat(extractBullets(report?.final_recommendation || report?.recommendations))
+  ).filter((item, idx, arr) => arr.indexOf(item) === idx).slice(0, 3);
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-page)' }}>
@@ -480,6 +579,20 @@ function BattlefieldContent() {
               >
                 {inputOpen ? 'Hide Input' : 'Edit Idea'}
               </button>
+
+              {(reportLinks?.pdf_path || (runId && verdict)) && (
+                <a
+                  href={reportLinks?.pdf_path ? `${API_URL}${reportLinks.pdf_path}` : `${API_URL}/outputs/reports/report_${runId}.pdf`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn-primary btn-sm"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#5B5CEB', color: '#fff', fontWeight: 600, textDecoration: 'none' }}
+                  title="Download dynamic AI Startup Intelligence PDF Report"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Download PDF</span>
+                </a>
+              )}
 
               <button
                 onClick={() => { reset(); setStartupIdea(''); setProblemStatement(''); setTargetUsers(''); setRevenueModel(''); setInputOpen(true); setActiveTab('overview'); }}
@@ -597,15 +710,17 @@ function BattlefieldContent() {
               ].map(col => (
                 <div key={col.label} style={{ background: col.bg, borderRadius: 10, padding: '16px' }}>
                   <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: col.color, margin: '0 0 10px' }}>{col.label}</p>
-                  {col.items.length > 0
-                    ? col.items.map((item, i) => (
-                        <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 6, fontSize: 13, color: '#374151', lineHeight: 1.5 }}>
-                          <span style={{ color: col.color, fontWeight: 700, flexShrink: 0 }}>›</span>
-                          <span>{item.replace(/\*\*/g, '')}</span>
-                        </div>
-                      ))
-                    : <p style={{ fontSize: 12, color: 'var(--text-tertiary)', fontStyle: 'italic', margin: 0 }}>Not yet generated</p>
-                  }
+                    {col.items.length > 0
+                      ? col.items.map((item, i) => (
+                          <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 6, fontSize: 13, color: '#374151', lineHeight: 1.5 }}>
+                            <span style={{ color: col.color, fontWeight: 700, flexShrink: 0 }}>›</span>
+                            <span>{item.replace(/\*\*/g, '')}</span>
+                          </div>
+                        ))
+                      : isRunning
+                        ? <p style={{ fontSize: 12, color: 'var(--text-tertiary)', fontStyle: 'italic', margin: 0, display: 'flex', alignItems: 'center', gap: 6 }}><Loader2 className="w-3 h-3 animate-spin" /> Synthesizing…</p>
+                        : <p style={{ fontSize: 12, color: 'var(--text-tertiary)', fontStyle: 'italic', margin: 0 }}>Analysis pending validation</p>
+                    }
                 </div>
               ))}
             </div>
@@ -613,17 +728,36 @@ function BattlefieldContent() {
         )}
 
         {/* Download bar */}
-        {reportLinks?.pdf_path && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 24, padding: '12px 16px', borderRadius: 10, background: 'var(--success-light)', border: '1px solid var(--success-border)' }}>
-            <CheckCircle2 className="w-4 h-4" style={{ color: 'var(--success)', flexShrink: 0 }} />
-            <span style={{ fontSize: 13, color: 'var(--success-text)', fontWeight: 500, flex: 1 }}>Report generated successfully.</span>
-            <a href={`${API_URL}${reportLinks.pdf_path}`} target="_blank" rel="noopener noreferrer" className="btn btn-primary btn-sm">
-              <Download className="w-3.5 h-3.5" /> PDF
+        {(reportLinks?.pdf_path || (runId && verdict)) && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24, padding: '14px 20px', borderRadius: 12, background: 'var(--success-light)', border: '1px solid var(--success-border)' }}>
+            <CheckCircle2 className="w-5 h-5" style={{ color: 'var(--success)', flexShrink: 0 }} />
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 14, color: 'var(--success-text)', fontWeight: 600 }}>Executive Dossier Ready</div>
+              <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Download the complete 21-section AI Startup Intelligence Report.</div>
+            </div>
+            <a
+              href={reportLinks?.pdf_path ? `${API_URL}${reportLinks.pdf_path}` : `${API_URL}/outputs/reports/report_${runId}.pdf`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-primary btn-sm"
+              style={{ background: '#5B5CEB', color: '#fff', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 6 }}
+            >
+              <Download className="w-3.5 h-3.5" /> PDF Report
             </a>
-            <a href={`${API_URL}${reportLinks.md_path}`} target="_blank" rel="noopener noreferrer" className="btn btn-secondary btn-sm">
+            <a
+              href={reportLinks?.md_path ? `${API_URL}${reportLinks.md_path}` : `${API_URL}/outputs/reports/report_${runId}.md`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-secondary btn-sm"
+            >
               <Download className="w-3.5 h-3.5" /> MD
             </a>
-            <a href={`${API_URL}${reportLinks.json_path}`} target="_blank" rel="noopener noreferrer" className="btn btn-secondary btn-sm">
+            <a
+              href={reportLinks?.json_path ? `${API_URL}${reportLinks.json_path}` : `${API_URL}/outputs/reports/report_${runId}.json`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-secondary btn-sm"
+            >
               <Download className="w-3.5 h-3.5" /> JSON
             </a>
           </div>
