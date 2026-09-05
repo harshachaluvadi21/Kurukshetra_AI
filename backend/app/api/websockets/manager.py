@@ -47,5 +47,5 @@ async def websocket_endpoint(websocket: WebSocket, run_id: str):
         while True:
             # We don't expect client to send messages, but keep connection alive
             await websocket.receive_text()
-    except WebSocketDisconnect:
+    except (WebSocketDisconnect, Exception):
         manager.disconnect(websocket, run_id)

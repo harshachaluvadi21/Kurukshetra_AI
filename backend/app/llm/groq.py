@@ -10,7 +10,7 @@ from app.llm.base import LLMProvider
 T = TypeVar('T', bound=BaseModel)
 
 class GroqProvider(LLMProvider):
-    def __init__(self, model_name: str = "llama-3.3-70b-versatile", max_retries: int = 1):
+    def __init__(self, model_name: str = "qwen/qwen3.8-27b", max_retries: int = 2):
         api_key = settings.groq_api_key or "missing_key"
         self.model_name = model_name
         self.model = ChatGroq(model=model_name, temperature=0.2, groq_api_key=api_key)
