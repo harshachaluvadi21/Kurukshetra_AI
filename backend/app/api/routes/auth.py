@@ -2,7 +2,7 @@
 Authentication API routes — register, login, Google OAuth, logout, me.
 """
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
@@ -13,6 +13,8 @@ from app.core.auth import (
     verify_password,
 )
 from app.core.settings import settings
+from app.core.rate_limit import limiter
+from app.core.security_logging import log_security_event
 from app.db.database import get_db
 from app.db.models import User
 from app.schemas.auth import (
@@ -50,16 +52,10 @@ def _token_response(user: User) -> TokenResponse:
 # POST /auth/register
 # --------------------------------------------------------------------------
 @router.post("/register", response_model=TokenResponse)
-async def register(payload: UserRegister, db: AsyncSession = Depends(get_db)):
-    # Validate email format (basic check)
-    if "@" not in payload.email or "." not in payload.email:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Invalid email format",
-        )
-
+@limiter.limit(f"{settings.auth_rate_limit}/minute")
+async def register(request: Request, payload: UserRegister, db: AsyncSession = Depends(get_db)):
     # Check for existing user
-    existing = await db.execute(select(User).where(User.email == payload.email))
+    existing = await db.execute(select(User).where(User.email == payload.email.lower().strip()))
     if existing.scalar_one_or_none():
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -67,7 +63,7 @@ async def register(payload: UserRegister, db: AsyncSession = Depends(get_db)):
         )
 
     user = User(
-        name=payload.name,
+        name=payload.name.strip(),
         email=payload.email.lower().strip(),
         password=hash_password(payload.password),
         provider="local",
@@ -76,6 +72,13 @@ async def register(payload: UserRegister, db: AsyncSession = Depends(get_db)):
     await db.commit()
     await db.refresh(user)
 
+    log_security_event(
+        event_type="AUTH_REGISTER_SUCCESS",
+        ip=request.client.host if request.client else "unknown",
+        user_id=str(user.id),
+        details={"email": user.email}
+    )
+
     return _token_response(user)
 
 
@@ -83,21 +86,44 @@ async def register(payload: UserRegister, db: AsyncSession = Depends(get_db)):
 # POST /auth/login
 # --------------------------------------------------------------------------
 @router.post("/login", response_model=TokenResponse)
-async def login(payload: UserLogin, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(User).where(User.email == payload.email.lower().strip()))
+@limiter.limit(f"{settings.auth_rate_limit}/minute")
+async def login(request: Request, payload: UserLogin, db: AsyncSession = Depends(get_db)):
+    ip = request.client.host if request.client else "unknown"
+    clean_email = payload.email.lower().strip()
+    result = await db.execute(select(User).where(User.email == clean_email))
     user = result.scalar_one_or_none()
 
     if not user or not user.password:
+        log_security_event(
+            event_type="AUTH_LOGIN_FAILED",
+            ip=ip,
+            details={"email": clean_email, "reason": "User not found or no password set"},
+            severity="WARNING"
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
         )
 
     if not verify_password(payload.password, user.password):
+        log_security_event(
+            event_type="AUTH_LOGIN_FAILED",
+            ip=ip,
+            user_id=str(user.id),
+            details={"email": clean_email, "reason": "Password mismatch"},
+            severity="WARNING"
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
         )
+
+    log_security_event(
+        event_type="AUTH_LOGIN_SUCCESS",
+        ip=ip,
+        user_id=str(user.id),
+        details={"email": clean_email}
+    )
 
     return _token_response(user)
 
@@ -110,7 +136,9 @@ GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v2/userinfo"
 
 
 @router.post("/google/callback", response_model=TokenResponse)
+@limiter.limit(f"{settings.auth_rate_limit * 2}/minute")
 async def google_callback(
+    request: Request,
     payload: GoogleCallbackRequest,
     db: AsyncSession = Depends(get_db),
 ):

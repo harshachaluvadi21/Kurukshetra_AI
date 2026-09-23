@@ -1,13 +1,18 @@
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from app.db.database import get_db, AsyncSessionLocal
 from app.db.models import Run, User
 from app.schemas.run import RunCreate, RunResponse, RunStatusResponse
 from app.core.auth import get_current_user
+from app.core.settings import settings
+from app.core.rate_limit import limiter
+from app.core.ai_limits import ai_limits_manager
+from app.core.security_logging import log_security_event
 import uuid
 import asyncio
 import json
+import logging
 
 from app.graph.main_graph import graph
 from app.graph.state import GraphState
@@ -19,6 +24,7 @@ from pathlib import Path
 
 router = APIRouter()
 REPORTS_DIR = Path(__file__).resolve().parents[3] / "outputs" / "reports"
+run_logger = logging.getLogger("kurukshetra.runs")
 
 def parse_idea_payload(raw_idea: str) -> dict:
     try:
@@ -89,10 +95,7 @@ async def execute_graph_run(run_id: str, project_id: str, idea_text: str):
             run = result.scalar_one_or_none()
             if run:
                 run.status = "failed" if final_state.get('errors') else "completed"
-                # Save final state to DB for history/reports
                 
-                # Make sure to convert any non-serializable objects inside final_state if needed, 
-                # but graph states should be mostly serializable. We might need to dict-ify BaseModel instances.
                 def serialize_obj(obj):
                     if hasattr(obj, "model_dump"):
                         return obj.model_dump()
@@ -112,7 +115,7 @@ async def execute_graph_run(run_id: str, project_id: str, idea_text: str):
                 event_type=EventType.EXECUTION_FAILED,
                 run_id=run_id,
                 timestamp=datetime.utcnow(),
-                data={"errors": final_state['errors']}
+                data={"errors": ["Simulation encountered an internal error during execution."]}
             ))
         else:
             await event_bus.publish(AppEvent(
@@ -123,7 +126,7 @@ async def execute_graph_run(run_id: str, project_id: str, idea_text: str):
             ))
 
     except Exception as e:
-        print(f"Graph execution failed: {e}")
+        run_logger.error(f"Graph execution failed for run {run_id}: {e}", exc_info=True)
         async with AsyncSessionLocal() as session:
             query = select(Run).where(Run.id == uuid.UUID(run_id))
             result = await session.execute(query)
@@ -136,23 +139,50 @@ async def execute_graph_run(run_id: str, project_id: str, idea_text: str):
             event_type=EventType.EXECUTION_FAILED,
             run_id=run_id,
             timestamp=datetime.utcnow(),
-            data={"errors": [str(e)]}
+            data={"errors": ["Simulation failed. Please verify provider connectivity and retry."]}
         ))
 
 
 @router.post("/", response_model=RunResponse)
+@limiter.limit(f"{settings.ai_rate_limit * 2}/minute")
 async def start_run(
+    request: Request,
     run_data: RunCreate,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    ip = request.client.host if request.client else "unknown"
+
+    # Enforce AI Kill Switch
+    if not settings.ai_enabled:
+        log_security_event(
+            event_type="KILL_SWITCH_ACTIVE",
+            ip=ip,
+            user_id=str(current_user.id),
+            details={"action": "start_run_blocked"},
+            severity="WARNING"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="AI services are temporarily disabled by the administrator."
+        )
+
+    # Check daily quota
+    current_usage = ai_limits_manager.get_user_daily_usage(str(current_user.id))
+    if current_usage >= settings.ai_daily_limit:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Daily AI usage limit of {settings.ai_daily_limit} runs exceeded. Quota resets at 00:00 UTC."
+        )
+
     run_id = uuid.uuid4()
     
-    try:
-        parsed_project_id = uuid.UUID(run_data.project_id) if run_data.project_id else None
-    except ValueError:
-        # Invalid UUID string provided; treat as no project ID
-        parsed_project_id = None
+    parsed_project_id = None
+    if run_data.project_id:
+        try:
+            parsed_project_id = uuid.UUID(run_data.project_id)
+        except ValueError:
+            parsed_project_id = None
     
     if parsed_project_id:
         from app.db.models import Project
@@ -165,10 +195,10 @@ async def start_run(
 
     # Store run metadata, linked to the authenticated user
     idea_payload = {
-        "idea": run_data.idea,
-        "problem_statement": run_data.problem_statement,
-        "target_users": run_data.target_users,
-        "revenue_model": run_data.revenue_model,
+        "idea": run_data.idea.strip(),
+        "problem_statement": run_data.problem_statement.strip() if run_data.problem_statement else None,
+        "target_users": run_data.target_users.strip() if run_data.target_users else None,
+        "revenue_model": run_data.revenue_model.strip() if run_data.revenue_model else None,
     }
     new_run = Run(
         id=run_id,
@@ -190,55 +220,143 @@ async def start_run(
     )
 
 @router.post("/{run_id}/execute")
-async def execute_run(run_id: str, background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_db)):
+@limiter.limit(f"{settings.ai_rate_limit}/minute")
+async def execute_run(
+    request: Request,
+    run_id: str,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    ip = request.client.host if request.client else "unknown"
+
+    # Validate UUID format strictly
     try:
-        query = select(Run).where(Run.id == uuid.UUID(run_id))
-        result = await db.execute(query)
-        run = result.scalar_one_or_none()
-        
-        if not run:
-            raise HTTPException(status_code=404, detail="Run not found")
-            
-        background_tasks.add_task(
-            execute_graph_run, 
-            str(run.id), 
-            str(run.project_id) if run.project_id else str(uuid.uuid4()), 
-            run.idea or "Unknown"
-        )
-        return {"status": "execution_started", "run_id": run_id}
+        run_uuid = uuid.UUID(run_id)
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid run_id format")
+
+    # Enforce AI Kill Switch & Daily Limit
+    ai_limits_manager.check_and_increment(str(current_user.id), ip)
+
+    query = select(Run).where(Run.id == run_uuid)
+    result = await db.execute(query)
+    run = result.scalar_one_or_none()
+    
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+        
+    # IDOR Check: Ensure run belongs to current authenticated user
+    if run.user_id and run.user_id != current_user.id:
+        log_security_event(
+            event_type="AUTHZ_VIOLATION",
+            ip=ip,
+            user_id=str(current_user.id),
+            details={"action": "execute_run", "target_run_id": run_id, "owner_id": str(run.user_id)},
+            severity="WARNING"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied: You do not have permission to execute this run."
+        )
+
+    background_tasks.add_task(
+        execute_graph_run, 
+        str(run.id), 
+        str(run.project_id) if run.project_id else str(uuid.uuid4()), 
+        run.idea or "Unknown"
+    )
+    return {"status": "execution_started", "run_id": run_id}
 
 @router.get("/{run_id}", response_model=RunStatusResponse)
-async def get_run_status(run_id: str, db: AsyncSession = Depends(get_db)):
+async def get_run_status(
+    run_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     try:
-        query = select(Run).where(Run.id == uuid.UUID(run_id))
-        result = await db.execute(query)
-        run = result.scalar_one_or_none()
-        
-        if not run:
-            raise HTTPException(status_code=404, detail="Run not found")
-            
-        progress = 0
-        if run.status == "completed":
-            progress = 100
-        elif run.status == "failed":
-            progress = 0
-        else:
-            progress = 50 
-            
-        return {
-            "run_id": str(run.id),
-            "status": run.status,
-            "progress": progress,
-            "final_state": run.final_state
-        }
+        run_uuid = uuid.UUID(run_id)
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid run_id format")
 
+    query = select(Run).where(Run.id == run_uuid)
+    result = await db.execute(query)
+    run = result.scalar_one_or_none()
+    
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+
+    # IDOR Check: Ensure run belongs to current authenticated user
+    if run.user_id and run.user_id != current_user.id:
+        log_security_event(
+            event_type="AUTHZ_VIOLATION",
+            user_id=str(current_user.id),
+            details={"action": "get_run_status", "target_run_id": run_id},
+            severity="WARNING"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied: You do not have permission to view this run."
+        )
+        
+    progress = 0
+    if run.status == "completed":
+        progress = 100
+    elif run.status == "failed":
+        progress = 0
+    else:
+        progress = 50 
+        
+    return {
+        "run_id": str(run.id),
+        "status": run.status,
+        "progress": progress,
+        "final_state": run.final_state
+    }
+
 @router.get("/{run_id}/report")
-async def get_run_report(run_id: str):
-    manifest_path = REPORTS_DIR / f"manifest_{run_id}.json"
+@limiter.limit("30/minute")
+async def get_run_report(
+    request: Request,
+    run_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        run_uuid = uuid.UUID(run_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid run_id format")
+
+    # IDOR Check: Ensure run belongs to current authenticated user
+    query = select(Run).where(Run.id == run_uuid)
+    result = await db.execute(query)
+    run = result.scalar_one_or_none()
+    
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+
+    if run.user_id and run.user_id != current_user.id:
+        log_security_event(
+            event_type="AUTHZ_VIOLATION",
+            user_id=str(current_user.id),
+            details={"action": "get_run_report", "target_run_id": run_id},
+            severity="WARNING"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied: You do not have permission to view this report."
+        )
+
+    # Path traversal protection: ensure file resides strictly inside REPORTS_DIR
+    manifest_path = (REPORTS_DIR / f"manifest_{run_id}.json").resolve()
+    try:
+        if not manifest_path.is_relative_to(REPORTS_DIR.resolve()):
+            raise HTTPException(status_code=400, detail="Invalid report path traversal detected")
+    except AttributeError:
+        # Python < 3.9 compatibility fallback
+        if not str(manifest_path).startswith(str(REPORTS_DIR.resolve())):
+            raise HTTPException(status_code=400, detail="Invalid report path traversal detected")
+
     if not manifest_path.exists():
         raise HTTPException(status_code=404, detail="Report not found")
 

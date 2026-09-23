@@ -22,12 +22,15 @@ out/
 *.tsbuildinfo
 
 # ── Environment & secrets ────────────────────────────────────────────
-.env
-.env.local
-.env.*.local
+.env*
+!.env.example
+!**/.env.example
+secrets/
 *.pem
 *.key
 *.secret
+credentials*.json
+service-account*.json
 
 # ── Database files ───────────────────────────────────────────────────
 *.db

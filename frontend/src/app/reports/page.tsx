@@ -6,6 +6,8 @@ import { VerdictBadge, StatusBadge } from '@/components/ui/Badge';
 import { EmptyState, LoadingState, ErrorState } from '@/components/ui/States';
 import { deriveDisplayName } from '@/components/ui/MarkdownRenderer';
 
+import { authHeaders } from '@/lib/auth-token';
+
 interface Run {
   run_id: string;
   idea: string;
@@ -50,7 +52,9 @@ export default function ReportsPage() {
   const fetchReports = async () => {
     setLoading(true); setError(null);
     try {
-      const res = await fetch(`${API_URL}/api/v1/runs/`);
+      const res = await fetch(`${API_URL}/api/v1/runs/`, {
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+      });
       if (!res.ok) throw new Error(`Server error ${res.status}`);
       const data = await res.json();
       setRuns((data.runs || []).filter((r: Run) => r.has_report));

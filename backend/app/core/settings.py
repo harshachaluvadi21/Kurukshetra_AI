@@ -44,6 +44,14 @@ class Settings(BaseSettings):
     google_client_secret: str = Field(..., alias="GOOGLE_CLIENT_SECRET")
     secret_key: str = Field(..., alias="SECRET_KEY")
     
+    # Security & AI Controls
+    ai_enabled: bool = Field(default=True, alias="AI_ENABLED")
+    ai_rate_limit: int = Field(default=5, alias="AI_RATE_LIMIT")
+    ai_daily_limit: int = Field(default=50, alias="AI_DAILY_LIMIT")
+    auth_rate_limit: int = Field(default=5, alias="AUTH_RATE_LIMIT")
+    max_prompt_length: int = Field(default=2000, alias="MAX_PROMPT_LENGTH")
+    cors_origins: str = Field(default="http://localhost:3000,http://127.0.0.1:3000", alias="CORS_ORIGINS")
+    
     model_config = SettingsConfigDict(env_file=env_path, env_file_encoding="utf-8", extra="ignore")
 
     def validate_health(self):

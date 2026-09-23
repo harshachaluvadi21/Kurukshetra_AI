@@ -11,6 +11,16 @@ import React from 'react';
  * - Removes raw internal formatting symbols
  */
 
+/** Sanitize raw HTML tags to prevent XSS injection */
+function sanitizeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 /** Strip and replace classification tags with badge markup */
 function processClassificationTags(line: string): string {
   return line
@@ -31,9 +41,10 @@ function processInlineFormatting(text: string): string {
     .replace(/`([^`]+)`/g, '<code>$1</code>');
 }
 
-/** Process a line to full HTML */
+/** Process a line to full HTML with XSS sanitization */
 function processLine(line: string): string {
-  return processClassificationTags(processInlineFormatting(line));
+  const safeLine = sanitizeHtml(line);
+  return processClassificationTags(processInlineFormatting(safeLine));
 }
 
 interface Block {

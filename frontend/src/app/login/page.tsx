@@ -6,14 +6,6 @@ import { Swords, Mail, Lock, ArrowRight, AlertCircle } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
 import { InlineLoader } from '@/components/ui/States';
 
-function getSafeNextPath() {
-  if (typeof window === 'undefined') return '/';
-  const next = new URLSearchParams(window.location.search).get('next');
-  if (!next || !next.startsWith('/') || next.startsWith('//')) return '/';
-  if (next.startsWith('/login') || next.startsWith('/register') || next.startsWith('/auth/')) return '/';
-  return next;
-}
-
 export default function LoginPage() {
   const router = useRouter();
   const { login, isAuthenticated, isLoading: authLoading, error, clearError } = useAuthStore();
@@ -21,8 +13,19 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [localError, setLocalError] = useState('');
+  const [nextPath, setNextPath] = useState('/');
 
-  useEffect(() => { if (isAuthenticated && !authLoading) router.push(getSafeNextPath()); }, [isAuthenticated, authLoading, router]);
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const next = new URLSearchParams(window.location.search).get('next');
+      if (next && next.startsWith('/') && !next.startsWith('//') &&
+          !next.startsWith('/login') && !next.startsWith('/register') && !next.startsWith('/auth/')) {
+        setNextPath(next);
+      }
+    }
+  }, []);
+
+  useEffect(() => { if (isAuthenticated && !authLoading) router.push(nextPath); }, [isAuthenticated, authLoading, router, nextPath]);
   useEffect(() => { clearError(); }, [clearError]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -30,7 +33,7 @@ export default function LoginPage() {
     setLocalError('');
     if (!email || !password) { setLocalError('Please fill in all fields'); return; }
     setSubmitting(true);
-    try { await login(email, password); router.push(getSafeNextPath()); }
+    try { await login(email, password); router.push(nextPath); }
     catch (err) { setLocalError(err instanceof Error ? err.message : 'Login failed'); }
     finally { setSubmitting(false); }
   };
@@ -61,7 +64,7 @@ export default function LoginPage() {
 
           {/* Google */}
           <a
-            href={`/api/auth/google?next=${encodeURIComponent(getSafeNextPath())}`}
+            href={`/api/auth/google?next=${encodeURIComponent(nextPath)}`}
             style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '10px 16px', borderRadius: 8, border: '1px solid var(--border-strong)', background: '#fff', fontSize: 14, fontWeight: 500, color: 'var(--text-primary)', cursor: 'pointer', textDecoration: 'none', transition: 'border-color 0.15s, background 0.15s', marginBottom: 20 }}
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24" style={{ width: 18, height: 18 }}>

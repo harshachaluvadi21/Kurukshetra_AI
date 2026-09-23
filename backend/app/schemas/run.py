@@ -1,13 +1,13 @@
-from pydantic import BaseModel, UUID4
+from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import datetime
 
 class RunCreate(BaseModel):
-    project_id: str
-    idea: str
-    problem_statement: Optional[str] = None
-    target_users: Optional[str] = None
-    revenue_model: Optional[str] = None
+    project_id: Optional[str] = Field(None, max_length=100)
+    idea: str = Field(..., min_length=3, max_length=2000, description="Startup business concept")
+    problem_statement: Optional[str] = Field(None, max_length=1000)
+    target_users: Optional[str] = Field(None, max_length=1000)
+    revenue_model: Optional[str] = Field(None, max_length=1000)
 
 class RunResponse(BaseModel):
     run_id: str

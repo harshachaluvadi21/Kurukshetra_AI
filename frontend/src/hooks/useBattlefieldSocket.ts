@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useBattlefieldStore } from '@/stores/battlefieldStore';
+import { getToken } from '@/lib/auth-token';
 
 export const useBattlefieldSocket = (runId: string | null, isMockMode: boolean) => {
   const [isConnected, setIsConnected] = useState(false);
@@ -23,8 +24,10 @@ export const useBattlefieldSocket = (runId: string | null, isMockMode: boolean) 
       }
     }
 
+    const token = getToken();
+    const tokenParam = token ? `?token=${encodeURIComponent(token)}` : '';
     const base = apiUrl.startsWith('https') ? 'wss://' : 'ws://';
-    const wsUrl = `${base}${host}/ws/v1/runs/${runId}`;
+    const wsUrl = `${base}${host}/ws/v1/runs/${runId}${tokenParam}`;
 
     let ws: WebSocket | null = null;
     try {
