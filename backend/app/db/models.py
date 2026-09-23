@@ -41,6 +41,8 @@ class Run(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     project_version_id = Column(UUID(as_uuid=True), ForeignKey("project_versions.id"), nullable=True)
     project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=True)
+    # Owner — nullable so pre-existing rows are preserved (they just won't appear in any user's history)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True, index=True)
     idea = Column(String, nullable=True)
     status = Column(String, nullable=False)
     final_state = Column(JSONB)

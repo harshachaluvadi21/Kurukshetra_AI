@@ -7,6 +7,14 @@ export const metadata: Metadata = {
   title: "Kurukshetra AI — Battle-Test Your Startup",
   description: "Multi-agent AI platform that evaluates startup ideas with market research, competitive analysis, financial modelling and scoring.",
   keywords: "startup analysis, AI, venture capital, market research, India, startup intelligence",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/favicon-32.png", type: "image/png", sizes: "32x32" },
+    ],
+    apple: { url: "/logo.png", sizes: "512x512", type: "image/png" },
+    shortcut: "/favicon.ico",
+  },
 };
 
 export default function RootLayout({

@@ -19,6 +19,7 @@ import { EmptyState, LoadingState, ErrorState } from '@/components/ui/States';
 import { MarkdownRenderer, deriveDisplayName } from '@/components/ui/MarkdownRenderer';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+import { authHeaders } from '@/lib/auth-token';
 
 /* ─── Types ─── */
 type TabId = 'overview' | 'market' | 'competition' | 'financials' | 'strategy' | 'risks' | 'report';
@@ -450,14 +451,18 @@ function BattlefieldContent() {
     setIsRunning(true);
     try {
       const res = await fetch(`${API_URL}/api/v1/runs/`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({ project_id: '00000000-0000-0000-0000-000000000000', idea: startupIdea, problem_statement: problemStatement, target_users: targetUsers, revenue_model: revenueModel }),
       });
       if (!res.ok) throw new Error('Failed to create run');
       const data = await res.json();
       if (data.run_id) {
         setRunId(data.run_id);
-        const execRes = await fetch(`${API_URL}/api/v1/runs/${data.run_id}/execute`, { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+        const execRes = await fetch(`${API_URL}/api/v1/runs/${data.run_id}/execute`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        });
         if (!execRes.ok) throw new Error('Failed to execute run');
       }
     } catch (err) {

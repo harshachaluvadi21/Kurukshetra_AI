@@ -2,8 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from app.db.database import get_db, AsyncSessionLocal
-from app.db.models import Run
+from app.db.models import Run, User
 from app.schemas.run import RunCreate, RunResponse, RunStatusResponse
+from app.core.auth import get_current_user
 import uuid
 import asyncio
 import json
@@ -140,7 +141,11 @@ async def execute_graph_run(run_id: str, project_id: str, idea_text: str):
 
 
 @router.post("/", response_model=RunResponse)
-async def start_run(run_data: RunCreate, db: AsyncSession = Depends(get_db)):
+async def start_run(
+    run_data: RunCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     run_id = uuid.uuid4()
     
     try:
@@ -158,7 +163,7 @@ async def start_run(run_data: RunCreate, db: AsyncSession = Depends(get_db)):
             db.add(dummy_proj)
             await db.commit()
 
-    # Store run metadata
+    # Store run metadata, linked to the authenticated user
     idea_payload = {
         "idea": run_data.idea,
         "problem_statement": run_data.problem_statement,
@@ -168,6 +173,7 @@ async def start_run(run_data: RunCreate, db: AsyncSession = Depends(get_db)):
     new_run = Run(
         id=run_id,
         project_id=parsed_project_id,
+        user_id=current_user.id,
         idea=json.dumps(idea_payload),
         status="created"
     )
@@ -253,8 +259,12 @@ async def get_run_report(run_id: str):
     }
 
 @router.get("/")
-async def list_runs(db: AsyncSession = Depends(get_db)):
-    query = select(Run).order_by(Run.created_at.desc())
+async def list_runs(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    # Only return runs that belong to the authenticated user
+    query = select(Run).where(Run.user_id == current_user.id).order_by(Run.created_at.desc())
     result = await db.execute(query)
     runs = result.scalars().all()
     

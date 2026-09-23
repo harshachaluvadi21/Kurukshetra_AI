@@ -1,19 +1,65 @@
+# ── Python ──────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+venv/
+.venv/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+
+# ── Node / Next.js ───────────────────────────────────────────────────
 node_modules/
 .next/
-venv/
-__pycache__/
-*.pyc
+out/
+.turbo/
+*.tsbuildinfo
+
+# ── Environment & secrets ────────────────────────────────────────────
 .env
 .env.local
 .env.*.local
-dist/
-build/
-.DS_Store
+*.pem
+*.key
+*.secret
+
+# ── Database files ───────────────────────────────────────────────────
+*.db
+*.sqlite
+*.sqlite3
 kurukshetra.db
 chroma_db/
-outputs/
-evaluation/benchmark_results.json
-scratch/
-backend/scripts/evaluate_campuspool_india.py
-backend/scripts/test_universal_framework.py
 
+# ── Generated outputs ────────────────────────────────────────────────
+outputs/
+reports/
+scratch/
+
+# ── PDFs & large docs (sensitive / generated) ────────────────────────
+*.pdf
+KURUKSHETRA_AI_COMPLETE_PROJECT_KNOWLEDGE_BOOK.md
+KURUKSHETRA_AI_COMPLETE_PROJECT_KNOWLEDGE_BOOK.pdf
+KURUKSHETRA_AI_INTERVIEW_PREPARATION.pdf
+
+# ── Test / temp / benchmark scripts ──────────────────────────────────
+backend/scripts/evaluate_*.py
+backend/scripts/test_*.py
+evaluation/benchmark_results.json
+
+# ── OS & editor ──────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# ── Logs ─────────────────────────────────────────────────────────────
+*.log
+logs/

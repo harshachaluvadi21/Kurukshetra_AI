@@ -1,10 +1,12 @@
 'use client';
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Clock, ExternalLink, FileText, Search, RefreshCw, Swords } from 'lucide-react';
 import Link from 'next/link';
 import { VerdictBadge, StatusBadge } from '@/components/ui/Badge';
 import { EmptyState, LoadingState, ErrorState } from '@/components/ui/States';
 import { deriveDisplayName } from '@/components/ui/MarkdownRenderer';
+import { authHeaders, getToken } from '@/lib/auth-token';
 
 interface Run {
   run_id: string;
@@ -36,15 +38,31 @@ function ScoreCell({ score }: { score: number | null }) {
 }
 
 export default function HistoryPage() {
+  const router = useRouter();
+  const [mounted, setMounted] = useState(false);
   const [runs, setRuns] = useState<Run[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
 
+  // Only runs client-side — never during SSR
   const fetchHistory = async () => {
     setLoading(true); setError(null);
+
+    const token = getToken();
+    if (!token) {
+      router.push('/login');
+      return;
+    }
+
     try {
-      const res = await fetch(`${API_URL}/api/v1/runs/`);
+      const res = await fetch(`${API_URL}/api/v1/runs/`, {
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+      });
+      if (res.status === 401) {
+        router.push('/login');
+        return;
+      }
       if (!res.ok) throw new Error(`Server error ${res.status}`);
       const data = await res.json();
       setRuns(data.runs || []);
@@ -55,7 +73,12 @@ export default function HistoryPage() {
     }
   };
 
-  useEffect(() => { fetchHistory(); }, []);
+  // Mark as mounted (client only), then fetch
+  useEffect(() => { setMounted(true); }, []);
+  useEffect(() => { if (mounted) fetchHistory(); }, [mounted]);
+
+  // Don't render anything until client-side hydration is complete
+  if (!mounted) return null;
 
   const filtered = runs.filter(r =>
     r.idea?.toLowerCase().includes(search.toLowerCase()) ||
